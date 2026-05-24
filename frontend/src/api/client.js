@@ -43,6 +43,8 @@ export const authApi = {
   register: (taxCode, businessName, password) =>
     request('/auth/register', { method: 'POST', body: JSON.stringify({ taxCode, businessName, password }) }),
   profile: () => request('/auth/profile'),
+  updateProfile: (data) =>
+    request('/auth/profile', { method: 'PATCH', body: JSON.stringify(data) }),
 };
 
 // ── POS ────────────────────────────────────────────────────────

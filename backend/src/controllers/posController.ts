@@ -146,7 +146,7 @@ export const createItem = async (req: Request, res: Response) => {
 export const updateItem = async (req: Request, res: Response) => {
   try {
     const uploadReq = req as UploadRequest;
-    const { id } = req.params;
+    const id = req.params['id'] as string;
 
     const existingItem = await prisma.posItem.findUnique({ where: { id } });
     if (!existingItem) {
@@ -183,7 +183,7 @@ export const updateItem = async (req: Request, res: Response) => {
 // Xóa sản phẩm / dịch vụ khỏi danh mục
 export const deleteItem = async (req: Request, res: Response) => {
   try {
-    const { id } = req.params;
+    const id = req.params['id'] as string;
 
     const existingItem = await prisma.posItem.findUnique({ where: { id } });
     if (!existingItem) {

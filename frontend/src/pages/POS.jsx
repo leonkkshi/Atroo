@@ -1,7 +1,31 @@
 import { useState, useEffect, useCallback } from 'react';
-import { posApi } from '../api/client';
+import { posApi, authApi } from '../api/client';
 import { fmtMoney, generateId } from '../utils/format';
 import { useAuth } from '../store/authStore';
+
+// Map tên ngân hàng → bank ID dùng cho VietQR
+const VIETQR_BANK_ID = {
+  'Vietcombank': 'VCB',
+  'VietinBank': 'CTG',
+  'BIDV': 'BIDV',
+  'Agribank': 'AGR',
+  'MB Bank': 'MB',
+  'Techcombank': 'TCB',
+  'ACB': 'ACB',
+  'VPBank': 'VPB',
+  'TPBank': 'TPB',
+  'Sacombank': 'STB',
+  'HDBank': 'HDB',
+  'SHB': 'SHB',
+  'OCB': 'OCB',
+  'MSB': 'MSB',
+  'SeABank': 'SEAB',
+  'LienVietPostBank': 'LPB',
+  'Eximbank': 'EIB',
+  'BacABank': 'BAB',
+  'PVcomBank': 'PVCB',
+  'VIB': 'VIB',
+};
 
 const TAX_RATES = { FOOD: 0.03, PRODUCT: 0.01, SERVICE: 0.05 };
 const TYPE_LABELS = { FOOD: '🍜 Đồ ăn / Nước uống', PRODUCT: '📦 Vật tư / Hàng hóa', SERVICE: '⚙️ Dịch vụ' };
@@ -151,31 +175,55 @@ function AddItemModal({ onClose, onAdded }) {
 }
 
 // ── QR Payment modal ──────────────────────────────────────────
-function QRModal({ amount, onClose, onConfirm }) {
-  const qrUrl = `https://img.vietqr.io/image/MB-0123456789-compact2.png?amount=${Math.round(amount)}&addInfo=ATro+Ban+Hang&accountName=HO+KINH+DOANH+A+TRO`;
+function QRModal({ amount, onClose, onConfirm, bankProfile }) {
+  const bankId   = VIETQR_BANK_ID[bankProfile?.bankName] || 'MB';
+  const bankAcct = bankProfile?.bankAccount || '0123456789';
+  const bankName = bankProfile?.bankName || 'MB Bank';
+  const holderName = bankProfile?.bankAccountName || 'HO KINH DOANH A TRO';
+  const hasCustomBank = !!(bankProfile?.bankAccount);
+
+  const qrUrl = `https://img.vietqr.io/image/${bankId}-${bankAcct}-compact2.png` +
+    `?amount=${Math.round(amount)}` +
+    `&addInfo=ATro+Ban+Hang` +
+    `&accountName=${encodeURIComponent(holderName)}`;
+
+  const [qrErr, setQrErr] = useState(false);
+
   return (
     <>
-      <div className="backdrop" onClick={onClose} />
-      <div className="modal">
+      <div className="backdrop" onClick={onClose} style={{ zIndex: 110 }} />
+      <div className="modal" style={{ zIndex: 111 }}>
         <div className="modal-inner" style={{ textAlign: 'center' }}>
-          <div className="h2 mb-2">Quét mã QR</div>
-          <div className="body mb-4">Số tiền: <strong style={{ color: 'var(--accent)' }}>{fmtMoney(amount)}</strong></div>
-          <img
-            src={qrUrl}
-            alt="QR thanh toán VietQR"
-            style={{ width: 220, height: 220, borderRadius: 16, margin: '0 auto 20px', border: '1px solid var(--border)' }}
-            onError={e => {
-              e.target.style.display = 'none';
-              e.target.nextSibling.style.display = 'flex';
-            }}
-          />
-          <div style={{ display: 'none', width: 220, height: 220, background: 'var(--bg)', borderRadius: 16, margin: '0 auto 20px', alignItems: 'center', justifyContent: 'center', fontSize: 13, color: 'var(--text-2)' }}>
-            Không thể tải QR<br/>Vui lòng kiểm tra kết nối
+          <div className="h2 mb-2">Quét mã QR thanh toán</div>
+          <div className="body mb-4">
+            Số tiền: <strong style={{ color: 'var(--accent)', fontFamily: 'Syne, sans-serif', fontSize: 18 }}>{fmtMoney(amount)}</strong>
           </div>
+
+          {!hasCustomBank && (
+            <div style={{ background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: 10, padding: '8px 14px', marginBottom: 16, fontSize: 12, color: 'var(--amber)', textAlign: 'left' }}>
+              ⚠️ Bạn chưa cấu hình tài khoản ngân hàng. Vào <strong>Cài đặt</strong> để thêm thông tin nhận tiền.
+            </div>
+          )}
+
+          {qrErr ? (
+            <div style={{ width: 220, height: 220, background: 'var(--bg)', borderRadius: 16, margin: '0 auto 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontSize: 13, color: 'var(--text-2)', border: '1px solid var(--border)' }}>
+              <span style={{ fontSize: 32, marginBottom: 8 }}>⚠️</span>
+              Không tải được QR<br/>Kiểm tra kết nối mạng
+            </div>
+          ) : (
+            <img
+              src={qrUrl}
+              alt="QR thanh toán VietQR"
+              style={{ width: 220, height: 220, borderRadius: 16, margin: '0 auto 20px', border: '1px solid var(--border)', display: 'block' }}
+              onError={() => setQrErr(true)}
+            />
+          )}
+
           <div style={{ background: 'var(--bg)', borderRadius: 12, padding: '12px 16px', marginBottom: 20, fontSize: 12, color: 'var(--text-2)', textAlign: 'left' }}>
-            <div><strong style={{ color: 'var(--text-1)' }}>MB Bank</strong> · 0123456789</div>
-            <div>Hộ kinh doanh A Trợ Demo</div>
+            <div><strong style={{ color: 'var(--text-1)' }}>{bankName}</strong> · {bankAcct}</div>
+            <div style={{ marginTop: 2 }}>{holderName}</div>
           </div>
+
           <div className="flex gap-3">
             <button className="btn btn-ghost w-full" onClick={onClose}>Huỷ</button>
             <button className="btn btn-primary w-full" id="qr-confirm" onClick={onConfirm}>✓ Đã nhận tiền</button>
@@ -187,11 +235,14 @@ function QRModal({ amount, onClose, onConfirm }) {
 }
 
 // ── Receipt for printing ──────────────────────────────────────
+// Lưu ý: KHÔNG dùng class 'no-print' vì CSS print sẽ hide nó.
+// Dùng id 'receipt-content' để toggle display qua JS khi in.
 function Receipt({ invoice, businessName }) {
   const items = invoice.items || [];
+  const payLabel = { CASH: 'Tiền mặt', QR_BANK: 'QR Bank', CARD: 'Thẻ' };
   return (
-    <div className="receipt no-print" id="receipt-content" style={{ display: 'none' }}>
-      <div className="receipt-center receipt-bold" style={{ fontSize: 16 }}>A TRỢ - {businessName?.toUpperCase()}</div>
+    <div className="receipt" id="receipt-content" style={{ display: 'none' }}>
+      <div className="receipt-center receipt-bold" style={{ fontSize: 16 }}>A TRỢ - {(businessName || 'CỬA HÀNG').toUpperCase()}</div>
       <div className="receipt-center" style={{ fontSize: 11 }}>Hệ thống quản lý bán hàng</div>
       <div className="receipt-divider" />
       <div className="receipt-center" style={{ fontSize: 11 }}>
@@ -219,6 +270,10 @@ function Receipt({ invoice, businessName }) {
           <span>{new Intl.NumberFormat('vi-VN').format(invoice.estimatedTax)} đ</span>
         </div>
       )}
+      <div className="receipt-row" style={{ fontSize: 11 }}>
+        <span>Thanh toán</span>
+        <span>{payLabel[invoice.paymentMethod] || invoice.paymentMethod}</span>
+      </div>
       <div className="receipt-divider" />
       <div className="receipt-center" style={{ fontSize: 10 }}>Cảm ơn quý khách!</div>
       <div className="receipt-center" style={{ fontSize: 10 }}>Hẹn gặp lại</div>
@@ -227,7 +282,7 @@ function Receipt({ invoice, businessName }) {
 }
 
 // ── Cart bottom sheet ─────────────────────────────────────────
-function CartSheet({ cart, onClose, onQty, onRemove, onCheckout, user }) {
+function CartSheet({ cart, onClose, onQty, onRemove, onCheckout, user, bankProfile }) {
   const [method, setMethod] = useState('CASH');
   const [loading, setLoading] = useState(false);
   const [showQR, setShowQR] = useState(false);
@@ -279,7 +334,14 @@ function CartSheet({ cart, onClose, onQty, onRemove, onCheckout, user }) {
                 className="btn btn-primary w-full"
                 onClick={() => {
                   const el = document.getElementById('receipt-content');
-                  if (el) { el.style.display = 'block'; window.print(); el.style.display = 'none'; }
+                  if (!el) return;
+                  // Hiện receipt, in, rồi ẩn lại
+                  el.style.setProperty('display', 'block', 'important');
+                  // Ẩn toàn bộ nội dung khác khi in
+                  document.body.setAttribute('data-printing', '1');
+                  window.print();
+                  el.style.display = 'none';
+                  document.body.removeAttribute('data-printing');
                 }}
               >
                 🖨️ In hóa đơn
@@ -295,13 +357,6 @@ function CartSheet({ cart, onClose, onQty, onRemove, onCheckout, user }) {
   return (
     <>
       <div className="backdrop" onClick={onClose} />
-      {showQR && (
-        <QRModal
-          amount={total}
-          onClose={() => setShowQR(false)}
-          onConfirm={() => { setShowQR(false); doCheckout('QR_BANK'); }}
-        />
-      )}
       <div className="bottom-sheet">
         <div className="bottom-sheet-handle" />
         <div style={{ padding: '16px 20px 40px' }}>
@@ -382,6 +437,14 @@ function CartSheet({ cart, onClose, onQty, onRemove, onCheckout, user }) {
           </button>
         </div>
       </div>
+      {showQR && (
+        <QRModal
+          amount={total}
+          onClose={() => setShowQR(false)}
+          onConfirm={() => { setShowQR(false); doCheckout('QR_BANK'); }}
+          bankProfile={bankProfile}
+        />
+      )}
     </>
   );
 }
@@ -396,12 +459,18 @@ export default function POS() {
   const [showAdd, setShowAdd] = useState(false);
   const [tab, setTab] = useState('ALL');
   const [search, setSearch] = useState('');
+  const [bankProfile, setBankProfile] = useState(null);
 
   useEffect(() => {
     posApi.getItems()
       .then(data => setItems(data.items || []))
       .catch(console.error)
       .finally(() => setLoading(false));
+
+    // Load bank info từ profile để dùng cho QR
+    authApi.profile()
+      .then(profile => setBankProfile(profile))
+      .catch(() => {}); // silent fail
   }, []);
 
   const addToCart = useCallback((item) => {
@@ -541,6 +610,7 @@ export default function POS() {
           onRemove={removeItem}
           onCheckout={handleCheckout}
           user={user}
+          bankProfile={bankProfile}
         />
       )}
     </div>

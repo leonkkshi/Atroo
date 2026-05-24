@@ -8,17 +8,22 @@ generator client {
 }
 
 model User {
-  id           Int              @id @default(autoincrement())
-  taxCode      String           @unique
-  businessName String
-  password     String
-  createdAt    DateTime         @default(now())
-  updatedAt    DateTime         @updatedAt
-  declarations TaxDeclaration[]
-  invoices     Invoice[]
-  chatMessages ChatMessage[]
-  deadlines    Deadline[]
-  posInvoices  PosInvoice[]
+  id               Int              @id @default(autoincrement())
+  taxCode          String           @unique
+  businessName     String
+  password         String
+  phone            String?
+  address          String?
+  bankName         String?
+  bankAccount      String?
+  bankAccountName  String?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  declarations     TaxDeclaration[]
+  invoices         Invoice[]
+  chatMessages     ChatMessage[]
+  deadlines        Deadline[]
+  posInvoices      PosInvoice[]
 }
 
 model TaxDeclaration {

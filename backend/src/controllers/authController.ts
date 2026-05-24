@@ -103,6 +103,11 @@ export const getProfile = async (req: any, res: Response) => {
         id: true,
         taxCode: true,
         businessName: true,
+        phone: true,
+        address: true,
+        bankName: true,
+        bankAccount: true,
+        bankAccountName: true,
         createdAt: true
       }
     });
@@ -114,5 +119,66 @@ export const getProfile = async (req: any, res: Response) => {
     res.json(user);
   } catch (error: any) {
     res.status(500).json({ error: 'Lấy thông tin thất bại.' });
+  }
+};
+
+export const updateProfile = async (req: any, res: Response) => {
+  try {
+    const userId = req.user.id;
+    const { businessName, phone, address, bankName, bankAccount, bankAccountName, currentPassword, newPassword } = req.body;
+
+    // Validation cơ bản
+    if (!businessName || !businessName.trim()) {
+      return res.status(400).json({ error: 'Tên cửa hàng / doanh nghiệp không được để trống.' });
+    }
+
+    const updateData: Record<string, any> = {
+      businessName: businessName.trim(),
+      phone: phone?.trim() || null,
+      address: address?.trim() || null,
+      bankName: bankName?.trim() || null,
+      bankAccount: bankAccount?.trim() || null,
+      bankAccountName: bankAccountName?.trim() || null,
+    };
+
+    // Đổi mật khẩu nếu có
+    if (newPassword) {
+      if (!currentPassword) {
+        return res.status(400).json({ error: 'Vui lòng nhập mật khẩu hiện tại để đổi mật khẩu.' });
+      }
+      const existing = await prisma.user.findUnique({ where: { id: userId } });
+      if (!existing) return res.status(404).json({ error: 'Không tìm thấy người dùng.' });
+
+      const bcrypt = await import('bcryptjs');
+      const match = await bcrypt.compare(currentPassword, existing.password);
+      if (!match) {
+        return res.status(400).json({ error: 'Mật khẩu hiện tại không đúng.' });
+      }
+      if (newPassword.length < 6) {
+        return res.status(400).json({ error: 'Mật khẩu mới phải có ít nhất 6 ký tự.' });
+      }
+      updateData.password = await bcrypt.hash(newPassword, 10);
+    }
+
+    const user = await prisma.user.update({
+      where: { id: userId },
+      data: updateData,
+      select: {
+        id: true,
+        taxCode: true,
+        businessName: true,
+        phone: true,
+        address: true,
+        bankName: true,
+        bankAccount: true,
+        bankAccountName: true,
+        createdAt: true
+      }
+    });
+
+    res.json({ message: 'Cập nhật thông tin thành công.', user });
+  } catch (error: any) {
+    console.error('[Auth] updateProfile error:', error);
+    res.status(500).json({ error: 'Cập nhật thất bại. Vui lòng thử lại.' });
   }
 };

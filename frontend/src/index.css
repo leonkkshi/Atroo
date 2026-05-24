@@ -1256,21 +1256,30 @@ select.input {
 
 /* ── Print styles ────────────────────────────────────────────── */
 @media print {
-  body { background: #fff !important; color: #000 !important; }
-  .bottom-nav, .sidebar, .fab, .no-print { display: none !important; }
-  .receipt {
+  /* Reset page */
+  body { background: #fff !important; color: #000 !important; font-family: 'Courier New', monospace !important; }
+
+  /* Ẩn toàn bộ UI của app */
+  .bottom-nav, .sidebar, .fab, .page-container,
+  .modal, .backdrop, .bottom-sheet { display: none !important; }
+
+  /* Chỉ show receipt */
+  #receipt-content {
+    display: block !important;
     font-family: 'Courier New', monospace;
     font-size: 12px;
     width: 80mm;
+    max-width: 80mm;
     margin: 0 auto;
     color: #000;
     background: #fff;
-    padding: 8mm;
+    padding: 8mm 4mm;
   }
-  .receipt-divider { border-top: 1px dashed #000; margin: 6px 0; }
-  .receipt-center { text-align: center; }
-  .receipt-bold   { font-weight: bold; }
-  .receipt-row    { display: flex; justify-content: space-between; }
+
+  .receipt-divider { border-top: 1px dashed #000 !important; margin: 6px 0; }
+  .receipt-center  { text-align: center; display: block; }
+  .receipt-bold    { font-weight: bold; }
+  .receipt-row     { display: flex !important; justify-content: space-between; }
 }
 
 /* ── Utility classes ─────────────────────────────────────────── */

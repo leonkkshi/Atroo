@@ -1,0 +1,12 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const calendarController_1 = require("../controllers/calendarController");
+const auth_1 = require("../middlewares/auth");
+const router = (0, express_1.Router)();
+router.use(auth_1.authMiddleware);
+router.get('/deadlines', calendarController_1.getDeadlines);
+router.post('/deadlines', calendarController_1.createDeadline);
+router.patch('/deadlines/:id', calendarController_1.updateDeadlineStatus);
+router.post('/deadlines/seed-defaults', calendarController_1.seedDefaultDeadlines);
+exports.default = router;

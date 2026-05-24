@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="300" height="220" viewBox="0 0 300 220" fill="none">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="300" y2="220" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#A855F7" stop-opacity="0.26"/>
+      <stop offset="1" stop-color="#00C4FF" stop-opacity="0.18"/>
+    </linearGradient>
+  </defs>
+  <rect width="300" height="220" rx="24" fill="#1C2340"/>
+  <rect x="16" y="16" width="268" height="188" rx="20" fill="url(#g)" stroke="#2A3356"/>
+  <rect x="88" y="72" width="124" height="72" rx="18" fill="#0A0E1A" fill-opacity="0.24"/>
+  <path d="M104 108h92" stroke="#FFFFFF" stroke-width="12" stroke-linecap="round"/>
+  <path d="M122 90l16 18 20-28 20 28" stroke="#C084FC" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="150" y="154" text-anchor="middle" font-family="Arial, sans-serif" font-size="22" font-weight="700" fill="#FFFFFF">⚙️ Dịch vụ</text>
+  <text x="150" y="178" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#F5F3FF">Cắt tóc · Sửa xe</text>
+</svg>

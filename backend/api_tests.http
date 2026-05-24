@@ -1,0 +1,97 @@
+@baseUrl = http://localhost:3000/api/v1
+@contentType = application/json
+
+### 1. Health Check
+GET http://localhost:3000/health
+
+### 2. Đăng ký tài khoản Hộ kinh doanh
+# @name registerRequest
+POST {{baseUrl}}/auth/register
+Content-Type: {{contentType}}
+
+{
+  "taxCode": "0123456789",
+  "businessName": "Hộ kinh doanh Nguyễn Văn An",
+  "password": "securesafepassword123"
+}
+
+### 3. Đăng nhập tài khoản
+# @name loginRequest
+POST {{baseUrl}}/auth/login
+Content-Type: {{contentType}}
+
+{
+  "taxCode": "0123456789",
+  "password": "securesafepassword123"
+}
+
+### LƯU Ý: Thay thế token nhận được từ Đăng nhập vào biến bên dưới
+@authToken = Bearer {{loginRequest.response.body.token}}
+
+### 4. Lấy thông tin tài khoản (Yêu cầu Token)
+GET {{baseUrl}}/auth/profile
+Authorization: {{authToken}}
+
+### 5. Tính toán thuế TNCN / VAT theo Hộ kinh doanh khoán Việt Nam
+POST {{baseUrl}}/tax/calculate
+Authorization: {{authToken}}
+Content-Type: {{contentType}}
+
+{
+  "taxType": "VAT",
+  "revenue": 150000000,
+  "businessType": "2" 
+}
+# Chú thích businessType:
+# 1: Thương mại (VAT 1%, TNCN 0.5%)
+# 2: Dịch vụ (VAT 5%, TNCN 2%)
+# 3: Sản xuất, vận tải (VAT 3%, TNCN 1.5%)
+# 4: Hoạt động khác (VAT 2%, TNCN 1%)
+
+### 6. Lưu tờ khai thuế đã lập
+POST {{baseUrl}}/tax/declarations
+Authorization: {{authToken}}
+Content-Type: {{contentType}}
+
+{
+  "taxType": "VAT",
+  "period": "Quý 2/2026",
+  "revenue": 150000000,
+  "expenses": 0,
+  "taxAmount": 7500000,
+  "status": "DRAFT"
+}
+
+### 7. Lấy danh sách các tờ khai thuế đã lưu
+GET {{baseUrl}}/tax/declarations
+Authorization: {{authToken}}
+
+### 8. Thiết lập các mốc thuế (deadlines) mặc định năm 2026 cho hộ kinh doanh
+POST {{baseUrl}}/calendar/deadlines/seed-defaults
+Authorization: {{authToken}}
+
+### 9. Lấy danh sách hạn nộp thuế
+GET {{baseUrl}}/calendar/deadlines
+Authorization: {{authToken}}
+
+### 10. Cập nhật trạng thái hạn nộp thuế (Ví dụ ID = 1)
+PATCH {{baseUrl}}/calendar/deadlines/1
+Authorization: {{authToken}}
+Content-Type: {{contentType}}
+
+{
+  "status": "PAID"
+}
+
+### 11. Gửi tin nhắn chat tư vấn Thuế với Trợ lý ảo A Trợ (AI)
+POST {{baseUrl}}/ai/message
+Authorization: {{authToken}}
+Content-Type: {{contentType}}
+
+{
+  "content": "Tôi là hộ kinh doanh dịch vụ ăn uống, doanh thu tháng này là 80 triệu thì tôi phải đóng những loại thuế nào và hạn nộp là khi nào hả A Trợ?"
+}
+
+### 12. Lấy lịch sử trò chuyện với AI
+GET {{baseUrl}}/ai/history
+Authorization: {{authToken}}

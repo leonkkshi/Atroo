@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="300" height="220" viewBox="0 0 300 220" fill="none">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="300" y2="220" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#00C4FF" stop-opacity="0.25"/>
+      <stop offset="1" stop-color="#00E5A0" stop-opacity="0.16"/>
+    </linearGradient>
+  </defs>
+  <rect width="300" height="220" rx="24" fill="#1C2340"/>
+  <rect x="16" y="16" width="268" height="188" rx="20" fill="url(#g)" stroke="#2A3356"/>
+  <path d="M114 74h72l20 20v52l-20 20h-72l-20-20V94l20-20z" fill="#0A0E1A" fill-opacity="0.28" stroke="#FFFFFF" stroke-opacity="0.5" stroke-width="4"/>
+  <path d="M130 84h40l12 12v34l-12 12h-40l-12-12V96l12-12z" fill="#00E5A0" fill-opacity="0.14"/>
+  <path d="M118 94h64" stroke="#00C4FF" stroke-width="6" stroke-linecap="round"/>
+  <text x="150" y="154" text-anchor="middle" font-family="Arial, sans-serif" font-size="22" font-weight="700" fill="#FFFFFF">📦 Sản phẩm</text>
+  <text x="150" y="178" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#E0F2FE">Hàng hóa · Vật tư</text>
+</svg>

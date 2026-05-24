@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="300" height="220" viewBox="0 0 300 220" fill="none">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="300" y2="220" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#00E5A0" stop-opacity="0.22"/>
+      <stop offset="1" stop-color="#00C4FF" stop-opacity="0.16"/>
+    </linearGradient>
+  </defs>
+  <rect width="300" height="220" rx="24" fill="#1C2340"/>
+  <rect x="16" y="16" width="268" height="188" rx="20" fill="url(#g)" stroke="#2A3356"/>
+  <circle cx="150" cy="92" r="34" fill="#0A0E1A" fill-opacity="0.35"/>
+  <path d="M150 74v36M132 92h36" stroke="#00E5A0" stroke-width="10" stroke-linecap="round"/>
+  <text x="150" y="154" text-anchor="middle" font-family="Arial, sans-serif" font-size="20" font-weight="700" fill="#FFFFFF">A Trợ POS</text>
+  <text x="150" y="178" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#C6D0EA">Ảnh sản phẩm</text>
+</svg>

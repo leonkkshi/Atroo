@@ -3,7 +3,7 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import { authMiddleware } from '../middlewares/auth';
-import { getItems, createItem, updateItem, deleteItem, createInvoice, getInvoices } from '../controllers/posController';
+import { getItems, createItem, updateItem, deleteItem, createInvoice, getInvoices, getExpenses, createExpense, deleteExpense } from '../controllers/posController';
 
 const router = Router();
 
@@ -51,5 +51,10 @@ router.delete('/items/:id', deleteItem);
 // Hóa đơn bán hàng
 router.post('/invoices', createInvoice);
 router.get('/invoices', getInvoices);
+
+// Chi phí phát sinh
+router.get('/expenses', getExpenses);
+router.post('/expenses', createExpense);
+router.delete('/expenses/:id', deleteExpense);
 
 export default router;

@@ -24,6 +24,7 @@ model User {
   chatMessages     ChatMessage[]
   deadlines        Deadline[]
   posInvoices      PosInvoice[]
+  posExpenses      PosExpense[]
 }
 
 model TaxDeclaration {
@@ -95,12 +96,26 @@ model PosItem {
 
 // Hoá đơn bán hàng POS của từng user
 model PosInvoice {
-  id            String   @id
-  userId        Int
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  total         Float
-  estimatedTax  Float    @default(0)
-  itemsJson     String   // JSON array of {id, name, price, type, quantity}
-  paymentMethod String   @default("CASH") // "CASH" | "QR_BANK" | "CARD"
-  createdAt     DateTime @default(now())
+  id             String   @id
+  userId         Int
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  total          Float
+  estimatedTax   Float    @default(0)
+  itemsJson      String   // JSON array of {id, name, price, type, quantity}
+  paymentMethod  String   @default("CASH") // "CASH" | "QR_BANK" | "CARD"
+  status         String   @default("PAID") // "PENDING" | "PAID" | "CANCELLED"
+  payosOrderCode Int?     @unique
+  createdAt      DateTime @default(now())
+}
+
+// Chi phí do người dùng nhập vào
+model PosExpense {
+  id        String   @id
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  amount    Float
+  category  String   // "OPERATING" | "MATERIAL" | "SALARY" | "OTHER"
+  date      String   // Định dạng YYYY-MM-DD
+  createdAt DateTime @default(now())
 }

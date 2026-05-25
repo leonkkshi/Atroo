@@ -3,6 +3,7 @@ import { taxApi } from '../api/client';
 import { fmtMoney, fmtDate } from '../utils/format';
 
 const TAX_TYPES = [
+  { value: 'HKD',     label: '🏠 Hộ kinh doanh (VAT + TNCN)', badge: 'badge-hkd' },
   { value: 'VAT',     label: '📋 Thuế GTGT (VAT)',          badge: 'badge-vat' },
   { value: 'TNCN',    label: '👤 Thuế Thu nhập cá nhân',     badge: 'badge-tncn' },
   { value: 'TNDN',    label: '🏢 Thuế Thu nhập doanh nghiệp',badge: 'badge-tndn' },
@@ -17,7 +18,7 @@ const BIZ_PRESETS = [
     label: 'Quán ăn',
     desc: 'Cơm bụi, bún phở...',
     bizType: '3', // Sản xuất, ăn uống
-    taxType: 'VAT',
+    taxType: 'HKD',
     hint: 'VAT 3% + TNCN 1.5% trên doanh thu',
   },
   {
@@ -26,7 +27,7 @@ const BIZ_PRESETS = [
     label: 'Tiệm tóc',
     desc: 'Cắt tóc, salon...',
     bizType: '2', // Dịch vụ
-    taxType: 'VAT',
+    taxType: 'HKD',
     hint: 'VAT 5% + TNCN 2% trên doanh thu',
   },
   {
@@ -35,7 +36,7 @@ const BIZ_PRESETS = [
     label: 'Sửa xe',
     desc: 'Sửa xe máy, garage...',
     bizType: '2', // Dịch vụ
-    taxType: 'VAT',
+    taxType: 'HKD',
     hint: 'VAT 5% + TNCN 2% trên doanh thu',
   },
 ];
@@ -50,12 +51,46 @@ const BIZ_TYPES = [
 const PERIODS = ['Tháng 01/2026','Tháng 02/2026','Tháng 03/2026','Tháng 04/2026','Tháng 05/2026','Tháng 06/2026','Quý 2/2026','Quý 3/2026','Năm 2026'];
 
 function formatDecimalPct(r) {
-  if (!r) return '—';
+  if (r === undefined || r === null) return '—';
   return (r * 100).toFixed(1) + '%';
 }
 
+function CountUp({ value, duration = 800 }) {
+  const [displayValue, setDisplayValue] = useState(0);
+
+  useEffect(() => {
+    let startTimestamp = null;
+    const endValue = parseInt(value, 10);
+    if (isNaN(endValue) || endValue === 0) {
+      setDisplayValue(0);
+      return;
+    }
+
+    let animationFrameId;
+
+    const step = (timestamp) => {
+      if (!startTimestamp) startTimestamp = timestamp;
+      const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+      // Easing function: easeOutQuad
+      const easeProgress = progress * (2 - progress);
+      setDisplayValue(Math.floor(easeProgress * endValue));
+
+      if (progress < 1) {
+        animationFrameId = window.requestAnimationFrame(step);
+      } else {
+        setDisplayValue(endValue);
+      }
+    };
+
+    animationFrameId = window.requestAnimationFrame(step);
+    return () => window.cancelAnimationFrame(animationFrameId);
+  }, [value, duration]);
+
+  return <>{fmtMoney(displayValue)}</>;
+}
+
 export default function Tax() {
-  const [taxType, setTaxType] = useState('VAT');
+  const [taxType, setTaxType] = useState('HKD');
   const [bizType, setBizType] = useState('2');
   const [revenue, setRevenue] = useState('');
   const [expenses, setExpenses] = useState('');
@@ -70,6 +105,12 @@ export default function Tax() {
   const [loadingDecl, setLoadingDecl] = useState(true);
   const [tab, setTab] = useState('calc'); // 'calc' | 'history'
 
+  // Stepper Animation State
+  const [stepperIndex, setStepperIndex] = useState(null);
+  const [stepperData, setStepperData] = useState(null);
+  const [stepperRev, setStepperRev] = useState(0);
+  const [stepperBiz, setStepperBiz] = useState('2');
+
   useEffect(() => {
     taxApi.getDeclarations()
       .then(data => setDeclarations(Array.isArray(data) ? data : []))
@@ -77,17 +118,52 @@ export default function Tax() {
       .finally(() => setLoadingDecl(false));
   }, []);
 
-  // Reset result when inputs change
-  useEffect(() => { setResult(null); setSaved(false); setError(''); }, [taxType, bizType, revenue, expenses]);
+  // Reset result and stepper when inputs change
+  useEffect(() => {
+    setResult(null);
+    setSaved(false);
+    setError('');
+    setStepperIndex(null);
+    setStepperData(null);
+  }, [taxType, bizType, revenue, expenses]);
+
+  // Handle sequential step increment
+  useEffect(() => {
+    if (stepperIndex === null || stepperIndex >= 8) return;
+
+    const timer = setTimeout(() => {
+      setStepperIndex(prev => {
+        if (prev === 7) {
+          // Finished the 8th step (index 7). Transition to showing the result!
+          setTimeout(() => {
+            setResult(stepperData);
+            setStepperIndex(null);
+          }, 350);
+          return 8;
+        }
+        return prev + 1;
+      });
+    }, 180); // 180ms delay per step (matching R22)
+
+    return () => clearTimeout(timer);
+  }, [stepperIndex, stepperData]);
 
   const handleCalc = async (e) => {
     e.preventDefault();
     const rev = parseFloat(revenue.replace(/\D/g, ''));
     if (!rev) { setError('Vui lòng nhập doanh thu hợp lệ.'); return; }
-    setLoading(true); setError(''); setResult(null);
+    setLoading(true); setError(''); setResult(null); setStepperIndex(null); setStepperData(null);
     try {
       const data = await taxApi.calculate(taxType, rev, bizType, parseFloat(expenses.replace(/\D/g, '')) || 0);
-      setResult(data);
+      
+      if (taxType === 'HKD') {
+        setStepperData(data);
+        setStepperRev(rev);
+        setStepperBiz(bizType);
+        setStepperIndex(0);
+      } else {
+        setResult(data);
+      }
     } catch (err) { setError(err.message); }
     finally { setLoading(false); }
   };
@@ -112,7 +188,7 @@ export default function Tax() {
     finally { setSaving(false); }
   };
 
-  const needsBizType = taxType === 'VAT' || taxType === 'TNCN';
+  const needsBizType = taxType === 'VAT' || taxType === 'TNCN' || taxType === 'HKD';
   const needsExpenses = taxType === 'TNDN';
   const isExempt = result && result.taxAmount === 0;
 
@@ -122,10 +198,24 @@ export default function Tax() {
     setResult(null);
     setSaved(false);
     setError('');
+    setStepperIndex(null);
+    setStepperData(null);
   };
 
-  const TAX_BADGE_MAP = { VAT: 'badge-vat', TNCN: 'badge-tncn', TNDN: 'badge-tndn', MON_BAI: 'badge-mon-bai' };
+  const TAX_BADGE_MAP = { HKD: 'badge-hkd', VAT: 'badge-vat', TNCN: 'badge-tncn', TNDN: 'badge-tndn', MON_BAI: 'badge-mon-bai' };
   const STATUS_BADGE  = { DRAFT: 'badge-draft', SUBMITTED: 'badge-submitted' };
+
+  // Stepper state classes
+  const getStepClass = (index) => {
+    if (stepperIndex > index) return 'step-row completed';
+    if (stepperIndex === index) return 'step-row active';
+    return 'step-row pending';
+  };
+
+  const getStepCircleContent = (index) => {
+    if (stepperIndex > index) return '✓';
+    return index + 1;
+  };
 
   return (
     <div className="page-container page-enter">
@@ -233,62 +323,193 @@ export default function Tax() {
               </div>
             )}
 
-            <button id="calc-tax-btn" className="btn btn-primary w-full" type="submit" disabled={loading}>
+            <button id="calc-tax-btn" className="btn btn-primary w-full" type="submit" disabled={loading || stepperIndex !== null}>
               {loading ? 'Đang tính toán...' : '🧮 Tính thuế ngay'}
             </button>
           </form>
 
-          {/* Result */}
+          {/* 8-Step Stepper Processing Visualizer */}
+          {stepperIndex !== null && (
+            <div className="card card--accent mb-4" style={{ animation: 'fadeIn 250ms var(--ease)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+                <span className="badge badge-hkd">HKD</span>
+                <div className="font-syne" style={{ fontSize: 15, fontWeight: 700 }}>
+                  ⚡ Quy trình xử lý thuế Hộ kinh doanh (8 bước)
+                </div>
+              </div>
+
+              <div className="stepper-container">
+                <div className={`stepper-line ${stepperIndex > 0 ? 'stepper-line-active' : ''}`} />
+                
+                {/* Step 1: Nhập doanh thu */}
+                <div className={getStepClass(0)}>
+                  <div className="step-circle">{getStepCircleContent(0)}</div>
+                  <div className="step-content">
+                    <div className="step-title">1. Nhập doanh thu</div>
+                    <div className="step-desc">
+                      {stepperIndex >= 0 ? `Doanh thu nhận vào: ${fmtMoney(stepperRev)}` : 'Chờ doanh thu đầu vào...'}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Step 2: Xác định ngành nghề */}
+                <div className={getStepClass(1)}>
+                  <div className="step-circle">{getStepCircleContent(1)}</div>
+                  <div className="step-content">
+                    <div className="step-title">2. Xác định ngành nghề</div>
+                    <div className="step-desc">
+                      {stepperIndex >= 1 ? `Ngành: ${BIZ_TYPES.find(b => b.value === stepperBiz)?.label.split(' (')[0]}` : 'Đang nhận diện lĩnh vực hoạt động...'}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Step 3: Lấy tỷ lệ thuế */}
+                <div className={getStepClass(2)}>
+                  <div className="step-circle">{getStepCircleContent(2)}</div>
+                  <div className="step-content">
+                    <div className="step-title">3. Lấy tỷ lệ thuế</div>
+                    <div className="step-desc">
+                      {stepperIndex >= 2 ? `Tỷ lệ: GTGT ${(stepperData?.rates.vatRate * 100).toFixed(1)}% · TNCN ${(stepperData?.rates.tncnRate * 100).toFixed(1)}%` : 'Đang truy xuất thuế suất Thông tư 40/2021/TT-BTC...'}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Step 4: Kiểm tra miễn thuế */}
+                <div className={getStepClass(3)}>
+                  <div className="step-circle">{getStepCircleContent(3)}</div>
+                  <div className="step-content">
+                    <div className="step-title">4. Kiểm tra miễn thuế</div>
+                    <div className="step-desc">
+                      {stepperIndex >= 3 ? (stepperData?.isExempt ? '🎉 Doanh thu dưới 100M/năm: MIỄN THUẾ!' : 'Doanh thu > 100M/năm: Không được miễn thuế.') : 'Đang kiểm tra ngưỡng doanh thu...'}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Step 5: Tính GTGT */}
+                <div className={getStepClass(4)}>
+                  <div className="step-circle">{getStepCircleContent(4)}</div>
+                  <div className="step-content">
+                    <div className="step-title">5. Tính GTGT</div>
+                    <div className="step-desc">
+                      {stepperIndex >= 4 ? (stepperData?.isExempt ? 'GTGT phải nộp: 0 ₫' : `Doanh thu × VATRate = ${fmtMoney(stepperData?.vatAmount)}`) : 'Đang tính toán thuế GTGT...'}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Step 6: Tính TNCN */}
+                <div className={getStepClass(5)}>
+                  <div className="step-circle">{getStepCircleContent(5)}</div>
+                  <div className="step-content">
+                    <div className="step-title">6. Tính TNCN</div>
+                    <div className="step-desc">
+                      {stepperIndex >= 5 ? (stepperData?.isExempt ? 'TNCN phải nộp: 0 ₫' : `Doanh thu × TNCNRate = ${fmtMoney(stepperData?.tncnAmount)}`) : 'Đang tính toán thuế TNCN...'}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Step 7: Tính tổng */}
+                <div className={getStepClass(6)}>
+                  <div className="step-circle">{getStepCircleContent(6)}</div>
+                  <div className="step-content">
+                    <div className="step-title">7. Tính tổng</div>
+                    <div className="step-desc">
+                      {stepperIndex >= 6 ? `Tổng thuế: GTGT + TNCN = ${fmtMoney(stepperData?.taxAmount)}` : 'Đang cộng dồn các loại thuế...'}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Step 8: Xuất kết quả */}
+                <div className={getStepClass(7)}>
+                  <div className="step-circle">{getStepCircleContent(7)}</div>
+                  <div className="step-content">
+                    <div className="step-title">8. Xuất kết quả</div>
+                    <div className="step-desc">
+                      {stepperIndex >= 7 ? 'Hoàn thành!' : 'Đang kết xuất báo cáo tờ khai...'}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Result Card */}
           {result && (
-            <div className="tax-result-card">
+            <div className="tax-result-card card card--accent" style={{ animation: 'fadeIn var(--dur-comp) var(--ease)' }}>
               <div className="flex items-center gap-3 mb-3">
-                <span className={`badge ${TAX_BADGE_MAP[result.taxType] || 'badge-vat'}`}>{result.taxType}</span>
+                <span className={`badge ${TAX_BADGE_MAP[result.taxType] || 'badge-vat'}`}>{result.taxType === 'HKD' ? 'Hộ kinh doanh' : result.taxType}</span>
                 <span style={{ fontSize: 13, color: 'var(--text-2)' }}>{period}</span>
               </div>
 
               {isExempt ? (
                 <div className="alert alert-success mb-3">
-                  🎉 <strong>Được miễn thuế!</strong> Doanh thu dưới ngưỡng chịu thuế theo quy định.
+                  🎉 <strong>Được miễn thuế!</strong> Doanh thu năm dưới ngưỡng chịu thuế theo Thông tư 40/2021/TT-BTC (≤ 100.000.000 ₫).
                 </div>
               ) : (
                 <>
                   <div style={{ fontSize: 12, color: 'var(--text-2)', marginBottom: 4 }}>Số thuế phải nộp</div>
-                  <div className="tax-amount-big">{fmtMoney(result.taxAmount)}</div>
+                  <div className="tax-amount-big accent-num" style={{ fontSize: 32, fontWeight: 700, color: 'var(--accent)', marginBottom: 12 }}>
+                    <CountUp value={result.taxAmount} />
+                  </div>
                 </>
               )}
 
-              <div className="divider" />
+              <div className="divider" style={{ margin: '16px 0' }} />
 
-              <div className="tax-detail-row">
-                <span className="tax-detail-label">Doanh thu</span>
-                <span className="tax-detail-val">{fmtMoney(result.revenue)}</span>
+              <div className="tax-detail-row" style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 8 }}>
+                <span className="tax-detail-label" style={{ color: 'var(--text-2)' }}>Doanh thu</span>
+                <span className="tax-detail-val" style={{ color: 'var(--text-1)', fontWeight: 600 }}>{fmtMoney(result.revenue)}</span>
               </div>
-              {result.expenses > 0 && (
-                <div className="tax-detail-row">
-                  <span className="tax-detail-label">Chi phí khấu trừ</span>
-                  <span className="tax-detail-val">{fmtMoney(result.expenses)}</span>
-                </div>
-              )}
-              {result.rates?.vatRate > 0 && (
-                <div className="tax-detail-row">
-                  <span className="tax-detail-label">Tỷ lệ VAT</span>
-                  <span className="tax-detail-val">{formatDecimalPct(result.rates.vatRate)}</span>
-                </div>
-              )}
-              {result.rates?.tncnRate > 0 && (
-                <div className="tax-detail-row">
-                  <span className="tax-detail-label">Tỷ lệ TNCN</span>
-                  <span className="tax-detail-val">{formatDecimalPct(result.rates.tncnRate)}</span>
-                </div>
-              )}
-              {result.rates?.tndnRate > 0 && (
-                <div className="tax-detail-row">
-                  <span className="tax-detail-label">Thuế suất TNDN</span>
-                  <span className="tax-detail-val">{formatDecimalPct(result.rates.tndnRate)}</span>
+
+              {result.taxType === 'HKD' && !isExempt && (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, margin: '16px 0' }}>
+                  <div className="card" style={{ borderTop: '2px solid var(--cyan)', background: 'rgba(10, 14, 26, 0.4)', padding: 12, borderRadius: 14 }}>
+                    <div style={{ fontSize: 11, color: 'var(--text-2)' }}>Thuế GTGT (VAT)</div>
+                    <div style={{ fontSize: 10, color: 'var(--cyan)' }}>Tỷ lệ: {formatDecimalPct(result.rates?.vatRate)}</div>
+                    <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--cyan)', marginTop: 4 }}>
+                      <CountUp value={result.vatAmount} />
+                    </div>
+                  </div>
+                  <div className="card" style={{ borderTop: '2px solid var(--accent)', background: 'rgba(10, 14, 26, 0.4)', padding: 12, borderRadius: 14 }}>
+                    <div style={{ fontSize: 11, color: 'var(--text-2)' }}>Thuế TNCN</div>
+                    <div style={{ fontSize: 10, color: 'var(--accent)' }}>Tỷ lệ: {formatDecimalPct(result.rates?.tncnRate)}</div>
+                    <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--accent)', marginTop: 4 }}>
+                      <CountUp value={result.tncnAmount} />
+                    </div>
+                  </div>
                 </div>
               )}
 
-              <div className="divider" />
+              {result.expenses > 0 && (
+                <div className="tax-detail-row" style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 8 }}>
+                  <span className="tax-detail-label" style={{ color: 'var(--text-2)' }}>Chi phí khấu trừ</span>
+                  <span className="tax-detail-val" style={{ color: 'var(--text-1)', fontWeight: 600 }}>{fmtMoney(result.expenses)}</span>
+                </div>
+              )}
+
+              {result.taxType !== 'HKD' && (
+                <>
+                  {result.rates?.vatRate > 0 && (
+                    <div className="tax-detail-row" style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 8 }}>
+                      <span className="tax-detail-label" style={{ color: 'var(--text-2)' }}>Tỷ lệ VAT</span>
+                      <span className="tax-detail-val" style={{ color: 'var(--text-1)', fontWeight: 600 }}>{formatDecimalPct(result.rates.vatRate)}</span>
+                    </div>
+                  )}
+                  {result.rates?.tncnRate > 0 && (
+                    <div className="tax-detail-row" style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 8 }}>
+                      <span className="tax-detail-label" style={{ color: 'var(--text-2)' }}>Tỷ lệ TNCN</span>
+                      <span className="tax-detail-val" style={{ color: 'var(--text-1)', fontWeight: 600 }}>{formatDecimalPct(result.rates.tncnRate)}</span>
+                    </div>
+                  )}
+                  {result.rates?.tndnRate > 0 && (
+                    <div className="tax-detail-row" style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 8 }}>
+                      <span className="tax-detail-label" style={{ color: 'var(--text-2)' }}>Thuế suất TNDN</span>
+                      <span className="tax-detail-val" style={{ color: 'var(--text-1)', fontWeight: 600 }}>{formatDecimalPct(result.rates.tndnRate)}</span>
+                    </div>
+                  )}
+                </>
+              )}
+
+              <div className="divider" style={{ margin: '16px 0' }} />
 
               {result.details && (
                 <div className="alert alert-info mb-3" style={{ fontSize: 12 }}>
@@ -307,7 +528,7 @@ export default function Tax() {
           )}
 
           {/* Info cards */}
-          {!result && (
+          {!result && stepperIndex === null && (
             <div className="flex-col gap-3 mt-4">
               <div className="card">
                 <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--accent)', marginBottom: 8 }}>📌 Ngưỡng miễn thuế</div>
@@ -340,17 +561,17 @@ export default function Tax() {
               ))
             ) : declarations.length === 0 ? (
               <div className="empty-state">
-                <div className="empty-icon">📋</div>
-                <div className="empty-title">Chưa có tờ khai</div>
-                <div className="empty-body">Tính thuế và lưu tờ khai từ tab Tính thuế.</div>
-                <button className="btn btn-primary btn-sm mt-3" onClick={() => setTab('calc')}>Tính thuế ngay</button>
+                <div className="empty-icon" style={{ fontSize: 48, color: 'var(--accent)', marginBottom: 12 }}>📋</div>
+                <div className="empty-title" style={{ fontSize: 16, fontWeight: 600 }}>Chưa có tờ khai</div>
+                <div className="empty-body" style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 16 }}>Tính thuế và lưu tờ khai từ tab Tính thuế.</div>
+                <button className="btn btn-primary btn-sm" onClick={() => setTab('calc')}>Tính thuế ngay</button>
               </div>
             ) : (
               declarations.map(d => (
                 <div key={d.id} className="list-item">
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div className="flex items-center gap-2 mb-1">
-                      <span className={`badge ${TAX_BADGE_MAP[d.taxType] || 'badge-vat'}`}>{d.taxType}</span>
+                      <span className={`badge ${TAX_BADGE_MAP[d.taxType] || 'badge-vat'}`}>{d.taxType === 'HKD' ? 'Hộ kinh doanh' : d.taxType}</span>
                       <span className={`badge ${STATUS_BADGE[d.status] || 'badge-draft'}`}>{d.status === 'DRAFT' ? 'Nháp' : 'Đã nộp'}</span>
                     </div>
                     <div style={{ fontSize: 13, fontWeight: 600 }}>{d.period}</div>

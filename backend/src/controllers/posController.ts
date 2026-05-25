@@ -291,3 +291,81 @@ export const getInvoices = async (req: AuthenticatedRequest, res: Response) => {
     res.status(500).json({ error: 'Không thể tải lịch sử hóa đơn.' });
   }
 };
+
+// ─── Chi phí POS ─────────────────────────────────────────────────────────────
+
+// Lấy danh sách chi phí của user hiện tại
+export const getExpenses = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const userId = req.user!.id;
+    const expenses = await prisma.posExpense.findMany({
+      where: { userId },
+      orderBy: { date: 'desc' },
+    });
+    res.json({ expenses });
+  } catch (err) {
+    console.error('[POS] getExpenses error:', err);
+    res.status(500).json({ error: 'Không thể tải danh sách chi phí.' });
+  }
+};
+
+// Thêm khoản chi phí mới
+export const createExpense = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const userId = req.user!.id;
+    const { id, title, amount, category, date } = req.body as {
+      id?: string;
+      title: string;
+      amount: number;
+      category: string;
+      date: string;
+    };
+
+    if (!title || !amount || !category || !date) {
+      res.status(400).json({ error: 'Thông tin chi phí không hợp lệ.' });
+      return;
+    }
+
+    const expense = await prisma.posExpense.create({
+      data: {
+        id: id ?? `exp_${Date.now()}`,
+        userId,
+        title: title.trim(),
+        amount: Number(amount),
+        category: category.trim(),
+        date: date.trim(),
+      },
+    });
+
+    res.status(201).json({ expense });
+  } catch (err) {
+    console.error('[POS] createExpense error:', err);
+    res.status(500).json({ error: 'Không thể tạo chi phí mới.' });
+  }
+};
+
+// Xóa khoản chi phí theo ID
+export const deleteExpense = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const userId = req.user!.id;
+    const id = req.params['id'] as string;
+
+    const existingExpense = await prisma.posExpense.findUnique({ where: { id } });
+    if (!existingExpense) {
+      res.status(404).json({ error: 'Không tìm thấy chi phí cần xóa.' });
+      return;
+    }
+
+    if (existingExpense.userId !== userId) {
+      res.status(403).json({ error: 'Bạn không có quyền xóa chi phí này.' });
+      return;
+    }
+
+    await prisma.posExpense.delete({ where: { id } });
+
+    res.json({ message: 'Đã xóa chi phí thành công.' });
+  } catch (err) {
+    console.error('[POS] deleteExpense error:', err);
+    res.status(500).json({ error: 'Không thể xóa chi phí.' });
+  }
+};

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { posApi, authApi } from '../api/client';
 import { fmtMoney, generateId } from '../utils/format';
 import { useAuth } from '../store/authStore';
@@ -237,47 +238,180 @@ function QRModal({ amount, onClose, onConfirm, bankProfile }) {
 // ── Receipt for printing ──────────────────────────────────────
 // Lưu ý: KHÔNG dùng class 'no-print' vì CSS print sẽ hide nó.
 // Dùng id 'receipt-content' để toggle display qua JS khi in.
-function Receipt({ invoice, businessName }) {
+function Receipt({ invoice, user, id = 'receipt-content' }) {
   const items = invoice.items || [];
   const payLabel = { CASH: 'Tiền mặt', QR_BANK: 'QR Bank', CARD: 'Thẻ' };
-  return (
-    <div className="receipt" id="receipt-content" style={{ display: 'none' }}>
-      <div className="receipt-center receipt-bold" style={{ fontSize: 16 }}>A TRỢ - {(businessName || 'CỬA HÀNG').toUpperCase()}</div>
-      <div className="receipt-center" style={{ fontSize: 11 }}>Hệ thống quản lý bán hàng</div>
-      <div className="receipt-divider" />
-      <div className="receipt-center" style={{ fontSize: 11 }}>
-        {new Date(invoice.createdAt).toLocaleString('vi-VN')}
+  
+  return createPortal(
+    <div className="receipt" id={id} style={{ display: 'none' }}>
+      {/* Thông tin Cửa hàng / Hộ kinh doanh */}
+      <div className="receipt-center receipt-bold" style={{ fontSize: 16, marginBottom: 4 }}>
+        {(user?.businessName || 'CỬA HÀNG').toUpperCase()}
       </div>
-      <div className="receipt-center" style={{ fontSize: 11 }}>HD: {invoice.id}</div>
+      
+      {user?.address && (
+        <div className="receipt-center" style={{ fontSize: 11, color: '#333' }}>
+          Đ/c: {user.address}
+        </div>
+      )}
+      {user?.phone && (
+        <div className="receipt-center" style={{ fontSize: 11, color: '#333' }}>
+          SĐT: {user.phone}
+        </div>
+      )}
+      {user?.taxCode && (
+        <div className="receipt-center" style={{ fontSize: 11, color: '#333', fontWeight: 600 }}>
+          MST: {user.taxCode}
+        </div>
+      )}
+
+      <div className="receipt-center" style={{ fontSize: 10, marginTop: 4, fontStyle: 'italic' }}>
+        Hệ thống quản lý bán hàng
+      </div>
+      
       <div className="receipt-divider" />
+      
+      <div className="receipt-center receipt-bold" style={{ fontSize: 13, marginBottom: 6 }}>
+        HÓA ĐƠN BÁN HÀNG
+      </div>
+
+      <div className="receipt-center" style={{ fontSize: 11 }}>
+        Thời gian: {new Date(invoice.createdAt).toLocaleString('vi-VN')}
+      </div>
+      <div className="receipt-center" style={{ fontSize: 11 }}>
+        Số HD: {invoice.id}
+      </div>
+      
+      <div className="receipt-divider" />
+      
+      {/* Chi tiết mặt hàng */}
       {items.map((it, i) => (
-        <div key={i}>
-          <div>{it.name}</div>
-          <div className="receipt-row">
-            <span>{it.quantity} x {new Intl.NumberFormat('vi-VN').format(it.price)}</span>
-            <span>{new Intl.NumberFormat('vi-VN').format(it.price * it.quantity)}</span>
+        <div key={i} style={{ marginBottom: 6 }}>
+          <div className="receipt-bold" style={{ fontSize: 12 }}>{it.name}</div>
+          <div className="receipt-row" style={{ fontSize: 11 }}>
+            <span>{it.quantity} x {fmtMoney(it.price)}</span>
+            <span>{fmtMoney(it.price * it.quantity)}</span>
           </div>
         </div>
       ))}
+      
       <div className="receipt-divider" />
-      <div className="receipt-row receipt-bold">
+      
+      {/* Tổng cộng & Thuế */}
+      <div className="receipt-row receipt-bold" style={{ fontSize: 13 }}>
         <span>TỔNG CỘNG</span>
-        <span>{new Intl.NumberFormat('vi-VN').format(invoice.total)} đ</span>
+        <span>{fmtMoney(invoice.total)}</span>
       </div>
+      
       {invoice.estimatedTax > 0 && (
-        <div className="receipt-row" style={{ fontSize: 10 }}>
+        <div className="receipt-row" style={{ fontSize: 11, color: '#333' }}>
           <span>Thuế ước tính</span>
-          <span>{new Intl.NumberFormat('vi-VN').format(invoice.estimatedTax)} đ</span>
+          <span>{fmtMoney(invoice.estimatedTax)}</span>
         </div>
       )}
+      
       <div className="receipt-row" style={{ fontSize: 11 }}>
         <span>Thanh toán</span>
         <span>{payLabel[invoice.paymentMethod] || invoice.paymentMethod}</span>
       </div>
+      
       <div className="receipt-divider" />
-      <div className="receipt-center" style={{ fontSize: 10 }}>Cảm ơn quý khách!</div>
-      <div className="receipt-center" style={{ fontSize: 10 }}>Hẹn gặp lại</div>
-    </div>
+      
+      <div className="receipt-center receipt-bold" style={{ fontSize: 11 }}>
+        CẢM ƠN QUÝ KHÁCH!
+      </div>
+      <div className="receipt-center" style={{ fontSize: 10, color: '#555' }}>
+        Hẹn gặp lại quý khách lần sau
+      </div>
+    </div>,
+    document.body
+  );
+}
+
+// ── History Invoice Detail Modal ──────────────────────────────
+function HistoryInvoiceModal({ invoice, onClose, user }) {
+  const payLabel = { CASH: 'Tiền mặt', QR_BANK: 'QR Bank', CARD: 'Thẻ' };
+  
+  return (
+    <>
+      <div className="backdrop" onClick={onClose} style={{ zIndex: 110 }} />
+      <div className="modal" style={{ zIndex: 111, maxWidth: 380 }}>
+        <div className="modal-inner">
+          <div className="flex justify-between items-center mb-4 no-print">
+            <span className="h2">Chi tiết hóa đơn</span>
+            <button className="btn btn-ghost btn-sm" onClick={onClose} style={{ padding: '4px 10px', height: 32 }}>Đóng</button>
+          </div>
+          
+          {/* Màn hình Preview hóa đơn */}
+          <div style={{ background: 'white', color: 'black', padding: 20, borderRadius: 16, marginBottom: 20, border: '1px solid var(--border)', boxShadow: 'inset 0 0 10px rgba(0,0,0,0.05)' }}>
+            <div style={{ fontFamily: 'monospace', fontSize: 12, color: '#000', lineHeight: 1.5 }}>
+              <div style={{ textAlign: 'center', fontWeight: 'bold', fontSize: 15, marginBottom: 4 }}>
+                {(user?.businessName || 'CỬA HÀNG').toUpperCase()}
+              </div>
+              {user?.address && <div style={{ textAlign: 'center', fontSize: 10 }}>Đ/c: {user.address}</div>}
+              {user?.phone && <div style={{ textAlign: 'center', fontSize: 10 }}>SĐT: {user.phone}</div>}
+              {user?.taxCode && <div style={{ textAlign: 'center', fontSize: 10 }}>MST: {user.taxCode}</div>}
+              
+              <div style={{ borderTop: '1px dashed #666', margin: '8px 0' }} />
+              
+              <div style={{ textAlign: 'center', fontWeight: 'bold', fontSize: 12, marginBottom: 6 }}>HÓA ĐƠN BÁN HÀNG</div>
+              <div style={{ fontSize: 10 }}>Số HD: {invoice.id}</div>
+              <div style={{ fontSize: 10 }}>Ngày: {new Date(invoice.createdAt).toLocaleString('vi-VN')}</div>
+              
+              <div style={{ borderTop: '1px dashed #666', margin: '8px 0' }} />
+              
+              {invoice.items?.map((it, i) => (
+                <div key={i} style={{ marginBottom: 6 }}>
+                  <div style={{ fontWeight: 'bold' }}>{it.name}</div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10 }}>
+                    <span>{it.quantity} x {fmtMoney(it.price)}</span>
+                    <span>{fmtMoney(it.price * it.quantity)}</span>
+                  </div>
+                </div>
+              ))}
+              
+              <div style={{ borderTop: '1px dashed #666', margin: '8px 0' }} />
+              
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: 13 }}>
+                <span>TỔNG CỘNG:</span>
+                <span>{fmtMoney(invoice.total)}</span>
+              </div>
+              {invoice.estimatedTax > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10 }}>
+                  <span>Thuế ước tính:</span>
+                  <span>{fmtMoney(invoice.estimatedTax)}</span>
+                </div>
+              )}
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginTop: 2 }}>
+                <span>Thanh toán:</span>
+                <span>{payLabel[invoice.paymentMethod] || invoice.paymentMethod}</span>
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: 12 }} className="no-print">
+            <button className="btn btn-ghost w-full" onClick={onClose}>Quay lại</button>
+            <button
+              className="btn btn-primary w-full"
+              onClick={() => {
+                const el = document.getElementById('receipt-history-print');
+                if (!el) return;
+                el.style.setProperty('display', 'block', 'important');
+                document.body.setAttribute('data-printing', '1');
+                window.print();
+                el.style.display = 'none';
+                document.body.removeAttribute('data-printing');
+              }}
+            >
+              🖨️ In hóa đơn
+            </button>
+          </div>
+          
+          {/* Receipt in ẩn thực tế (Ẩn đi trên màn hình, chỉ show khi ấn window.print) */}
+          <Receipt invoice={invoice} user={user} id="receipt-history-print" />
+        </div>
+      </div>
+    </>
   );
 }
 
@@ -347,7 +481,7 @@ function CartSheet({ cart, onClose, onQty, onRemove, onCheckout, user, bankProfi
                 🖨️ In hóa đơn
               </button>
             </div>
-            <Receipt invoice={doneInvoice} businessName={user?.businessName} />
+            <Receipt invoice={doneInvoice} user={user} />
           </div>
         </div>
       </>
@@ -461,6 +595,20 @@ export default function POS() {
   const [search, setSearch] = useState('');
   const [bankProfile, setBankProfile] = useState(null);
 
+  // States cho Quản lý Lịch sử
+  const [view, setView] = useState('sales'); // 'sales' | 'history'
+  const [history, setHistory] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [selectedInvoice, setSelectedInvoice] = useState(null);
+
+  const loadHistory = useCallback(() => {
+    setHistoryLoading(true);
+    posApi.getInvoices()
+      .then(data => setHistory(data.invoices || []))
+      .catch(console.error)
+      .finally(() => setHistoryLoading(false));
+  }, []);
+
   useEffect(() => {
     posApi.getItems()
       .then(data => setItems(data.items || []))
@@ -471,7 +619,9 @@ export default function POS() {
     authApi.profile()
       .then(profile => setBankProfile(profile))
       .catch(() => {}); // silent fail
-  }, []);
+
+    loadHistory(); // Load sẵn lịch sử hóa đơn
+  }, [loadHistory]);
 
   const addToCart = useCallback((item) => {
     setCart(prev => {
@@ -492,9 +642,12 @@ export default function POS() {
     setCart(prev => prev.filter(c => c.id !== id));
   }, []);
 
-  const handleCheckout = (inv) => {
-    // Clear cart after done shown
-  };
+  const handleCheckout = useCallback((inv) => {
+    // Clear cart và cập nhật danh sách lịch sử khi thanh toán thành công
+    setCart([]);
+    loadHistory();
+  }, [loadHistory]);
+
   const handleCartClose = () => {
     setShowCart(false);
     setCart([]);
@@ -524,80 +677,151 @@ export default function POS() {
       {/* Header */}
       <div className="page-header">
         <div>
-          <div className="page-title">Bán hàng</div>
-          <div className="page-sub">Chọn sản phẩm để thêm vào giỏ</div>
+          <div className="page-title">{view === 'sales' ? 'Bán hàng' : 'Lịch sử hóa đơn'}</div>
+          <div className="page-sub">
+            {view === 'sales' ? 'Chọn sản phẩm để thêm vào giỏ' : 'Xem danh sách và in lại hóa đơn đã bán'}
+          </div>
         </div>
-        <button id="add-item-btn" className="btn btn-ghost btn-sm" onClick={() => setShowAdd(true)}>+ Thêm SP</button>
+        <div style={{ display: 'flex', gap: 10 }}>
+          {view === 'sales' ? (
+            <>
+              <button id="view-history-btn" className="btn btn-ghost btn-sm" onClick={() => { setView('history'); loadHistory(); }}>
+                📄 Lịch sử
+              </button>
+              <button id="add-item-btn" className="btn btn-ghost btn-sm" onClick={() => setShowAdd(true)}>
+                + Thêm SP
+              </button>
+            </>
+          ) : (
+            <button id="view-sales-btn" className="btn btn-primary btn-sm" onClick={() => setView('sales')}>
+              🛒 Quay lại bán hàng
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* Search */}
-      <div className="input-group mb-4">
-        <input
-          id="pos-search"
-          className="input"
-          placeholder="🔍 Tìm sản phẩm..."
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-        />
-      </div>
+      {view === 'sales' ? (
+        <>
+          {/* Search */}
+          <div className="input-group mb-4">
+            <input
+              id="pos-search"
+              className="input"
+              placeholder="🔍 Tìm sản phẩm..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+            />
+          </div>
 
-      {/* Tabs */}
-      <div className="tabs mb-4">
-        {TABS.map(t => (
-          <button key={t} id={`tab-${t.toLowerCase()}`} className={`tab-btn${tab === t ? ' active' : ''}`} onClick={() => setTab(t)}>
-            {TAB_CONFIG[t]?.label || t}
-          </button>
-        ))}
-      </div>
+          {/* Tabs */}
+          <div className="tabs mb-4">
+            {TABS.map(t => (
+              <button key={t} id={`tab-${t.toLowerCase()}`} className={`tab-btn${tab === t ? ' active' : ''}`} onClick={() => setTab(t)}>
+                {TAB_CONFIG[t]?.label || t}
+              </button>
+            ))}
+          </div>
 
-      {/* Product grid */}
-      {loading ? (
-        <div className="pos-grid">
-          {[1,2,3,4,5,6].map(i => (
-            <div key={i} className="skeleton" style={{ height: 100, borderRadius: 16 }} />
-          ))}
-        </div>
-      ) : filtered.length === 0 ? (
-        <div className="empty-state">
-          <div className="empty-icon">📦</div>
-          <div className="empty-title">Không có sản phẩm</div>
-          <div className="empty-body">Thêm món ăn, dịch vụ cắt tóc hoặc dịch vụ sửa xe.</div>
-          <button className="btn btn-primary btn-sm mt-3" onClick={() => setShowAdd(true)}>+ Thêm ngay</button>
-        </div>
-      ) : groupedForDisplay ? (
-        // Hiển thị theo nhóm khi tab=ALL
-        <div className="flex-col gap-6">
-          {[
-            { key: 'food',    icon: '🍜', label: 'Đồ ăn / Nước uống', items: groupedForDisplay.food },
-            { key: 'service', icon: '⚙️', label: 'Dịch vụ (Cắt tóc · Sửa xe)', items: groupedForDisplay.service },
-            { key: 'product', icon: '📦', label: 'Vật tư / Hàng hóa', items: groupedForDisplay.product },
-          ].filter(g => g.items.length > 0).map(group => (
-            <div key={group.key}>
-              <div className="section-title mb-3">{group.icon} {group.label}</div>
-              <div className="pos-grid">
-                {group.items.map(item => {
-                  const inCart = cart.find(c => c.id === item.id);
-                  return <ItemCard key={item.id} item={item} inCart={inCart} onClick={() => addToCart(item)} />;
-                })}
-              </div>
+          {/* Product grid */}
+          {loading ? (
+            <div className="pos-grid">
+              {[1,2,3,4,5,6].map(i => (
+                <div key={i} className="skeleton" style={{ height: 100, borderRadius: 16 }} />
+              ))}
             </div>
-          ))}
-        </div>
-      ) : (
-        <div className="pos-grid">
-          {filtered.map(item => {
-            const inCart = cart.find(c => c.id === item.id);
-            return <ItemCard key={item.id} item={item} inCart={inCart} onClick={() => addToCart(item)} />;
-          })}
-        </div>
-      )}
+          ) : filtered.length === 0 ? (
+            <div className="empty-state">
+              <div className="empty-icon">📦</div>
+              <div className="empty-title">Không có sản phẩm</div>
+              <div className="empty-body">Thêm món ăn, dịch vụ cắt tóc hoặc dịch vụ sửa xe.</div>
+              <button className="btn btn-primary btn-sm mt-3" onClick={() => setShowAdd(true)}>+ Thêm ngay</button>
+            </div>
+          ) : groupedForDisplay ? (
+            // Hiển thị theo nhóm khi tab=ALL
+            <div className="flex-col gap-6">
+              {[
+                { key: 'food',    icon: '🍜', label: 'Đồ ăn / Nước uống', items: groupedForDisplay.food },
+                { key: 'service', icon: '⚙️', label: 'Dịch vụ (Cắt tóc · Sửa xe)', items: groupedForDisplay.service },
+                { key: 'product', icon: '📦', label: 'Vật tư / Hàng hóa', items: groupedForDisplay.product },
+              ].filter(g => g.items.length > 0).map(group => (
+                <div key={group.key}>
+                  <div className="section-title mb-3">{group.icon} {group.label}</div>
+                  <div className="pos-grid">
+                    {group.items.map(item => {
+                      const inCart = cart.find(c => c.id === item.id);
+                      return <ItemCard key={item.id} item={item} inCart={inCart} onClick={() => addToCart(item)} />;
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="pos-grid">
+              {filtered.map(item => {
+                const inCart = cart.find(c => c.id === item.id);
+                return <ItemCard key={item.id} item={item} inCart={inCart} onClick={() => addToCart(item)} />;
+              })}
+            </div>
+          )}
 
-      {/* FAB cart button */}
-      {cartQty > 0 && (
-        <button id="open-cart-fab" className="fab" onClick={() => setShowCart(true)} aria-label="Xem giỏ hàng">
-          🛒
-          <span className="fab-cart-count">{cartQty}</span>
-        </button>
+          {/* FAB cart button */}
+          {cartQty > 0 && (
+            <button id="open-cart-fab" className="fab" onClick={() => setShowCart(true)} aria-label="Xem giỏ hàng">
+              🛒
+              <span className="fab-cart-count">{cartQty}</span>
+            </button>
+          )}
+        </>
+      ) : (
+        /* History view */
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {historyLoading ? (
+            [1, 2, 3].map(i => (
+              <div key={i} className="skeleton" style={{ height: 90, borderRadius: 20 }} />
+            ))
+          ) : history.length === 0 ? (
+            <div className="empty-state">
+              <div className="empty-icon">📄</div>
+              <div className="empty-title">Chưa có hóa đơn nào</div>
+              <div className="empty-body">Thực hiện bán hàng để ghi nhận hóa đơn vào lịch sử hệ thống.</div>
+              <button className="btn btn-primary btn-sm mt-3" onClick={() => setView('sales')}>🛒 Tạo hóa đơn mới</button>
+            </div>
+          ) : (
+            history.map(inv => {
+              const itemsCount = inv.items?.reduce((sum, it) => sum + it.quantity, 0) || 0;
+              const payLabel = { CASH: 'Tiền mặt', QR_BANK: 'QR Bank', CARD: 'Thẻ' };
+              
+              return (
+                <div
+                  key={inv.id}
+                  className="card"
+                  onClick={() => setSelectedInvoice(inv)}
+                  style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', transition: 'transform 0.15s ease', padding: '16px 20px' }}
+                  onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.01)'; }}
+                  onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; }}
+                >
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <strong style={{ fontSize: 14, color: 'var(--text-1)' }}>HD: {inv.id.slice(-8)}</strong>
+                      <span className={`badge ${inv.paymentMethod === 'QR_BANK' ? 'badge-food' : inv.paymentMethod === 'CARD' ? 'badge-service' : 'badge-product'}`} style={{ fontSize: 10, padding: '1px 6px' }}>
+                        {payLabel[inv.paymentMethod] || inv.paymentMethod}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: 12, color: 'var(--text-2)' }}>
+                      {new Date(inv.createdAt).toLocaleString('vi-VN')} · {itemsCount} sản phẩm
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'right', display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <strong style={{ fontSize: 16, color: 'var(--accent)', fontFamily: 'Syne, sans-serif' }}>
+                      {fmtMoney(inv.total)}
+                    </strong>
+                    <span style={{ fontSize: 16, color: 'var(--text-2)' }}>➔</span>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
       )}
 
       {/* Modals */}
@@ -611,6 +835,13 @@ export default function POS() {
           onCheckout={handleCheckout}
           user={user}
           bankProfile={bankProfile}
+        />
+      )}
+      {selectedInvoice && (
+        <HistoryInvoiceModal
+          invoice={selectedInvoice}
+          onClose={() => setSelectedInvoice(null)}
+          user={user}
         />
       )}
     </div>

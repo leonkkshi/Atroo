@@ -9,6 +9,7 @@ router.use(authMiddleware);
 router.get('/deadlines', getDeadlines);
 router.post('/deadlines', createDeadline);
 router.patch('/deadlines/:id', updateDeadlineStatus);
+router.patch('/deadlines/:id/status', updateDeadlineStatus);
 router.post('/deadlines/seed-defaults', seedDefaultDeadlines);
 
 export default router;

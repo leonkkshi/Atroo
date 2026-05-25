@@ -56,6 +56,9 @@ export const posApi = {
   },
   createInvoice: (invoice) => request('/pos/invoices', { method: 'POST', body: JSON.stringify(invoice) }),
   getInvoices: (limit = 50) => request(`/pos/invoices?limit=${limit}`),
+  getExpenses: () => request('/pos/expenses'),
+  createExpense: (expense) => request('/pos/expenses', { method: 'POST', body: JSON.stringify(expense) }),
+  deleteExpense: (id) => request(`/pos/expenses/${id}`, { method: 'DELETE' }),
 };
 
 // ── Tax ────────────────────────────────────────────────────────

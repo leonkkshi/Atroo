@@ -18,8 +18,11 @@ export const calculateTax = async (req: any, res: Response) => {
     let tncnRate = 0;
     let taxAmount = 0;
     let details = '';
+    let vatAmount = 0;
+    let tncnAmount = 0;
+    let isExempt = false;
 
-    if (taxType === 'VAT' || taxType === 'TNCN') {
+    if (taxType === 'VAT' || taxType === 'TNCN' || taxType === 'HKD') {
       // Xác định tỷ lệ thuế theo ngành nghề (Thông tư 40)
       // 1: Phân phối, cung cấp hàng hóa (Thương mại)
       // 2: Dịch vụ, xây dựng không bao thầu nguyên vật liệu
@@ -49,16 +52,25 @@ export const calculateTax = async (req: any, res: Response) => {
           break;
       }
 
-      if (taxType === 'VAT') {
-        taxAmount = rev * vatRate;
+      // Kiểm tra miễn thuế (Doanh thu năm từ 100 triệu trở xuống)
+      if (rev <= 100000000) {
+        isExempt = true;
+        vatAmount = 0;
+        tncnAmount = 0;
+        taxAmount = 0;
+        details += ' Doanh thu từ 100 triệu ₫/năm trở xuống thuộc diện được miễn thuế VAT & TNCN.';
       } else {
-        taxAmount = rev * tncnRate;
-      }
-
-      // Hộ kinh doanh có doanh thu từ 100 triệu đồng/năm trở xuống thuộc diện không phải nộp thuế VAT và TNCN
-      // Ở đây chúng ta giả sử doanh thu tính theo năm, hoặc hiển thị cảnh báo nếu doanh thu thấp
-      if (rev <= 100000000 && taxType !== 'TNDN') {
-        details += ' Cảnh báo: Doanh thu năm dưới 100 triệu ₫ được miễn thuế VAT & TNCN.';
+        vatAmount = rev * vatRate;
+        tncnAmount = rev * tncnRate;
+        
+        if (taxType === 'VAT') {
+          taxAmount = vatAmount;
+        } else if (taxType === 'TNCN') {
+          taxAmount = tncnAmount;
+        } else {
+          taxAmount = vatAmount + tncnAmount;
+          details += ` Tính GTGT: ${rev.toLocaleString('vi-VN')} ₫ × ${vatRate * 100}% = ${Math.round(vatAmount).toLocaleString('vi-VN')} ₫. Tính TNCN: ${rev.toLocaleString('vi-VN')} ₫ × ${tncnRate * 100}% = ${Math.round(tncnAmount).toLocaleString('vi-VN')} ₫.`;
+        }
       }
     } else if (taxType === 'TNDN') {
       // Đối với Doanh nghiệp siêu nhỏ áp dụng thuế suất TNDN 20% trên thu nhập tính thuế
@@ -86,7 +98,7 @@ export const calculateTax = async (req: any, res: Response) => {
         details = 'Doanh thu dưới 100 triệu ₫/năm: Được miễn lệ phí môn bài.';
       }
     } else {
-      return res.status(400).json({ error: 'Loại thuế không hợp lệ. Chỉ hỗ trợ VAT, TNCN, TNDN, MON_BAI.' });
+      return res.status(400).json({ error: 'Loại thuế không hợp lệ. Chỉ hỗ trợ VAT, TNCN, TNDN, MON_BAI, HKD.' });
     }
 
     res.json({
@@ -99,6 +111,9 @@ export const calculateTax = async (req: any, res: Response) => {
         tncnRate,
         tndnRate: taxType === 'TNDN' ? 0.20 : 0
       },
+      vatAmount: Math.round(vatAmount),
+      tncnAmount: Math.round(tncnAmount),
+      isExempt,
       details
     });
   } catch (error: any) {

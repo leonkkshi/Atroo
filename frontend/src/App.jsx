@@ -10,6 +10,7 @@ import Finance from './pages/Finance';
 import Tax from './pages/Tax';
 import Calendar from './pages/Calendar';
 import Chat from './pages/Chat';
+import Settings from './pages/Settings';
 
 function AuthGate() {
   const [mode, setMode] = useState('login'); // 'login' | 'register'
@@ -41,6 +42,7 @@ function AppRoutes() {
                 <Route path="tax"       element={<Tax />} />
                 <Route path="calendar"  element={<Calendar />} />
                 <Route path="chat"      element={<Chat />} />
+                <Route path="settings"  element={<Settings />} />
                 <Route path="*"         element={<Navigate to="/dashboard" replace />} />
               </Routes>
             </Layout>

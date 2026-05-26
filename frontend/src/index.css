@@ -1256,21 +1256,30 @@ select.input {
 
 /* ── Print styles ────────────────────────────────────────────── */
 @media print {
-  body { background: #fff !important; color: #000 !important; }
-  .bottom-nav, .sidebar, .fab, .no-print { display: none !important; }
-  .receipt {
+  /* Reset page */
+  body { background: #fff !important; color: #000 !important; font-family: 'Courier New', monospace !important; }
+
+  /* Ẩn toàn bộ UI của app */
+  .bottom-nav, .sidebar, .fab, .page-container,
+  .modal, .backdrop, .bottom-sheet { display: none !important; }
+
+  /* Chỉ show receipt */
+  #receipt-content, #receipt-history-print, .receipt {
+    display: block !important;
     font-family: 'Courier New', monospace;
     font-size: 12px;
     width: 80mm;
+    max-width: 80mm;
     margin: 0 auto;
     color: #000;
     background: #fff;
-    padding: 8mm;
+    padding: 8mm 4mm;
   }
-  .receipt-divider { border-top: 1px dashed #000; margin: 6px 0; }
-  .receipt-center { text-align: center; }
-  .receipt-bold   { font-weight: bold; }
-  .receipt-row    { display: flex; justify-content: space-between; }
+
+  .receipt-divider { border-top: 1px dashed #000 !important; margin: 6px 0; }
+  .receipt-center  { text-align: center; display: block; }
+  .receipt-bold    { font-weight: bold; }
+  .receipt-row     { display: flex !important; justify-content: space-between; }
 }
 
 /* ── Utility classes ─────────────────────────────────────────── */
@@ -1356,3 +1365,97 @@ select.input {
 
 /* ── Touch target ensure ─────────────────────────────────────── */
 button, a, [role="button"] { min-height: 44px; }
+
+/* ── Stepper Styles ─────────────────────────────────────────── */
+.badge-hkd { background: rgba(0, 229, 160, 0.15); color: var(--accent); }
+
+.stepper-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  position: relative;
+  padding-left: 12px;
+  margin: 20px 0;
+}
+.stepper-line {
+  position: absolute;
+  left: 21px;
+  top: 10px;
+  bottom: 10px;
+  width: 2px;
+  background: var(--border);
+  z-index: 1;
+  transition: background 300ms var(--ease);
+}
+.stepper-line-active {
+  background: var(--accent);
+}
+.step-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  position: relative;
+  z-index: 2;
+  transition: opacity 250ms var(--ease);
+}
+.step-circle {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--bg);
+  border: 2px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  color: var(--text-2);
+  transition: all 250ms var(--ease);
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.step-row.completed .step-circle {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #0A0E1A;
+  font-weight: bold;
+}
+.step-row.active .step-circle {
+  border-color: var(--accent);
+  background: var(--surface);
+  color: var(--accent);
+  box-shadow: 0 0 0 4px var(--accent-dim);
+  animation: pulse-ring 1.5s infinite;
+}
+.step-content {
+  flex: 1;
+}
+.step-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-2);
+  transition: color 250ms var(--ease);
+}
+.step-row.active .step-title {
+  color: var(--accent);
+}
+.step-row.completed .step-title {
+  color: var(--text-1);
+}
+.step-desc {
+  font-size: 12px;
+  color: var(--text-2);
+  margin-top: 2px;
+  transition: color 250ms var(--ease);
+}
+.step-row.completed .step-desc {
+  color: var(--text-2);
+}
+.step-row.active .step-desc {
+  color: var(--text-1);
+}
+
+@keyframes pulse-ring {
+  0% { box-shadow: 0 0 0 0 rgba(0, 229, 160, 0.4); }
+  70% { box-shadow: 0 0 0 6px rgba(0, 229, 160, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(0, 229, 160, 0); }
+}

@@ -71,4 +71,4 @@ backend/uploads/*
 # ============================================
 # DOCKER
 # ============================================
-.dockerignore
+# .dockerignore được commit để Railway dùng

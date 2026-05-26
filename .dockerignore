@@ -1,0 +1,9 @@
+frontend/
+backend/node_modules/
+backend/dist/
+backend/.env
+backend/prisma/dev.db
+.git/
+.gitignore
+.gitattributes
+*.md

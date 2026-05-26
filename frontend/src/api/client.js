@@ -1,5 +1,6 @@
 // API client — centralized fetch wrapper với JWT auto-inject
-const BASE = '/api/v1';
+// Trong production (Vercel), VITE_API_BASE_URL trỏ tới Railway backend
+const BASE = import.meta.env.VITE_API_BASE_URL || '/api/v1';
 
 function getToken() {
   return localStorage.getItem('token');

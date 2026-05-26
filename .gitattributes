@@ -1,0 +1,9 @@
+# Force LF line endings for shell scripts (critical for Docker/Linux)
+*.sh text eol=lf
+
+# Auto-detect text files and normalize line endings
+* text=auto
+
+# SQL and config files — LF
+*.sql text eol=lf
+*.toml text eol=lf

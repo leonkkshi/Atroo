@@ -1,13 +1,9 @@
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../store/authStore';
+import logoMonogram from '../assets/logo-monogram.png';
+import logoWordmark from '../assets/logo-wordmark.png';
 
-const NAV_ITEMS = [
-  { path: '/dashboard', label: 'Tổng quan', icon: IconDashboard },
-  { path: '/pos',       label: 'Bán hàng',  icon: IconPOS },
-  { path: '/finance',   label: 'Tài chính', icon: IconFinance },
-  { path: '/tax',       label: 'Thuế',      icon: IconTax },
-  { path: '/chat',      label: 'A Trợ AI',  icon: IconChat },
-];
+
 
 // ── SVG Icons ─────────────────────────────────────────────────
 function IconDashboard() {
@@ -88,32 +84,6 @@ const SIDEBAR_ITEMS = [
   { path: '/settings',  label: 'Cài đặt',   icon: IconSettings },
 ];
 
-// ── Bottom Navigation (mobile) ─────────────────────────────────
-export function BottomNav() {
-  const navigate = useNavigate();
-  const location = useLocation();
-
-  return (
-    <nav className="bottom-nav" role="navigation" aria-label="Navigation chính">
-      {NAV_ITEMS.map(item => {
-        const active = location.pathname === item.path;
-        return (
-          <button
-            key={item.path}
-            id={`nav-${item.path.slice(1)}`}
-            className={`nav-item${active ? ' active' : ''}`}
-            onClick={() => navigate(item.path)}
-            aria-label={item.label}
-          >
-            <item.icon />
-            <span>{item.label}</span>
-            {active && <div className="nav-dot" />}
-          </button>
-        );
-      })}
-    </nav>
-  );
-}
 
 // ── Sidebar (desktop) ─────────────────────────────────────────
 export function Sidebar() {
@@ -129,8 +99,34 @@ export function Sidebar() {
   return (
     <aside className="sidebar">
       <div className="sidebar-logo">
-        <div className="logo-text">A Trợ</div>
-        <div className="logo-sub">Trợ lý Thuế AI</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <img 
+            src={logoMonogram} 
+            alt="ATRO Monogram" 
+            style={{ 
+              width: '32px', 
+              height: '32px', 
+              objectFit: 'contain',
+              filter: 'invert(1) brightness(1.2) contrast(1.2)',
+              mixBlendMode: 'screen',
+              flexShrink: 0
+            }} 
+          />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
+            <img 
+              src={logoWordmark} 
+              alt="ATRO Wordmark" 
+              style={{ 
+                height: '16px', 
+                objectFit: 'contain',
+                filter: 'invert(1) brightness(1.2) contrast(1.2)',
+                mixBlendMode: 'screen',
+                alignSelf: 'flex-start'
+              }} 
+            />
+            <div className="logo-sub" style={{ margin: 0, lineHeight: 1 }}>Trợ lý Thuế AI</div>
+          </div>
+        </div>
       </div>
 
       <nav className="sidebar-nav">
@@ -173,7 +169,6 @@ export default function Layout({ children }) {
       <main className="main-content">
         {children}
       </main>
-      <BottomNav />
     </div>
   );
 }

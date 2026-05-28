@@ -543,6 +543,48 @@ select.input {
 }
 .pos-item-card:hover { border-color: var(--accent); transform: translateY(-2px); }
 .pos-item-card:active { transform: scale(0.97); }
+/* Manage mode — visual cue: amber border, no hover effect */
+.pos-item-card.manage-mode {
+  cursor: default;
+  border-color: rgba(245,158,11,0.35);
+}
+.pos-item-card.manage-mode:hover { transform: none; border-color: rgba(245,158,11,0.55); }
+.pos-item-card.manage-mode:active { transform: none; }
+/* Action overlay buttons (edit / delete) */
+.pos-item-actions {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(10,14,26,0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border-radius: 16px;
+  animation: fadeIn var(--dur-micro) var(--ease);
+}
+.pos-item-action-btn {
+  width: 44px; height: 44px;
+  border-radius: 12px;
+  border: none;
+  font-size: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform var(--dur-micro) var(--ease), box-shadow var(--dur-micro) var(--ease);
+}
+.pos-item-action-btn.edit {
+  background: rgba(0,229,160,0.18);
+  color: var(--accent);
+  border: 1px solid rgba(0,229,160,0.35);
+}
+.pos-item-action-btn.edit:hover { transform: scale(1.1); background: var(--accent-dim); }
+.pos-item-action-btn.delete {
+  background: rgba(239,68,68,0.15);
+  color: var(--red);
+  border: 1px solid rgba(239,68,68,0.3);
+}
+.pos-item-action-btn.delete:hover { transform: scale(1.1); background: var(--red-dim); }
 .pos-item-media {
   position: relative;
   width: 100%;

@@ -1,16 +1,28 @@
 import { Request, Response } from 'express';
 import { AuthenticatedRequest } from '../middlewares/auth';
 import prisma from '../utils/prisma';
+import { uploadImageToCloudinary, deleteImageFromCloudinary } from '../utils/cloudinary';
 
-const DEFAULT_ITEM_IMAGE = '/uploads/pos-placeholder.svg';
+// ─── Ảnh mặc định ─────────────────────────────────────────────────────────────
+// Dùng inline SVG data URI thay vì file /uploads/*.svg
+// → hoạt động trên mọi môi trường kể cả Railway (không cần filesystem)
+const makeSvg = (emoji: string) =>
+  `data:image/svg+xml,${encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="150" viewBox="0 0 200 150">` +
+    `<rect width="200" height="150" fill="%231C2340"/>` +
+    `<text x="100" y="95" font-size="64" text-anchor="middle" dominant-baseline="middle">${emoji}</text>` +
+    `</svg>`,
+  )}`;
+
+const DEFAULT_ITEM_IMAGE = makeSvg('📦');
 const DEFAULT_IMAGE_BY_TYPE: Record<string, string> = {
-  FOOD: '/uploads/pos-food.svg',
-  PRODUCT: '/uploads/pos-product.svg',
-  SERVICE: '/uploads/pos-service.svg',
+  FOOD:    makeSvg('🍜'),
+  PRODUCT: makeSvg('📦'),
+  SERVICE: makeSvg('⚙️'),
 };
 
 type UploadRequest = Request & {
-  file?: Express.Multer.File;
+  file?: Express.Multer.File; // file.buffer có sẵn vì dùng memoryStorage
 };
 
 type ItemBody = {
@@ -40,61 +52,78 @@ function normalizeItemBody(body: ItemBody) {
   };
 }
 
-// ─── Danh sách sản phẩm mặc định ─────────────────────────────────────────────
-// Bao gồm 3 loại hình: Quán ăn nhỏ · Tiệm cắt tóc · Tiệm sửa xe
-const DEFAULT_ITEMS = [
-  // ── 🍜 Quán ăn nhỏ ──────────────────────────────────────────────────────────
-  { id: 'food_01', name: 'Cơm đĩa bình dân',      price:  30000, type: 'FOOD' },
-  { id: 'food_02', name: 'Cơm sườn trứng',        price:  40000, type: 'FOOD' },
-  { id: 'food_03', name: 'Bát phở bò tái',        price:  45000, type: 'FOOD' },
-  { id: 'food_04', name: 'Bún bò Huế',            price:  40000, type: 'FOOD' },
-  { id: 'food_05', name: 'Hũ tiếu Nam Vang',      price:  40000, type: 'FOOD' },
-  { id: 'food_06', name: 'Bún riêu cua',          price:  35000, type: 'FOOD' },
-  { id: 'food_07', name: 'Cơm tấm ba rọi',        price:  45000, type: 'FOOD' },
-  { id: 'drk_01', name: 'Trà đá',                 price:   5000, type: 'PRODUCT' },
-  { id: 'drk_02', name: 'Nước ngọt lon',          price:  12000, type: 'PRODUCT' },
-  { id: 'drk_03', name: 'Cà phê đá',             price:  20000, type: 'PRODUCT' },
-  { id: 'drk_04', name: 'Nước suối',              price:   8000, type: 'PRODUCT' },
+// ─── Danh sách sản phẩm mặc định ──────────────────────────────────────────────
+// Seed riêng cho từng user lần đầu đăng nhập POS (id gắn với userId tránh đụng)
+const DEFAULT_ITEMS_TEMPLATE = [
+  // ── 🍜 Quán ăn nhỏ ──────────────────────────────────────────────────────────────────
+  { key: 'food_01', name: 'Cơm đĩa bình dân',      price:  30000, type: 'FOOD' },
+  { key: 'food_02', name: 'Cơm sườn trứng',        price:  40000, type: 'FOOD' },
+  { key: 'food_03', name: 'Bát phở bò tái',        price:  45000, type: 'FOOD' },
+  { key: 'food_04', name: 'Bún bò Huế',            price:  40000, type: 'FOOD' },
+  { key: 'food_05', name: 'Hũ tiếu Nam Vang',      price:  40000, type: 'FOOD' },
+  { key: 'food_06', name: 'Bún riêu cua',          price:  35000, type: 'FOOD' },
+  { key: 'food_07', name: 'Cơm tấm ba rọi',        price:  45000, type: 'FOOD' },
+  { key: 'drk_01', name: 'Trà đá',                 price:   5000, type: 'PRODUCT' },
+  { key: 'drk_02', name: 'Nước ngọt lon',          price:  12000, type: 'PRODUCT' },
+  { key: 'drk_03', name: 'Cà phê đá',             price:  20000, type: 'PRODUCT' },
+  { key: 'drk_04', name: 'Nước suối',              price:   8000, type: 'PRODUCT' },
 
-  // ── ✂️ Tiệm cắt tóc ─────────────────────────────────────────────────────────
-  { id: 'hair_01', name: 'Cắt tóc nam basic',     price:  50000, type: 'SERVICE' },
-  { id: 'hair_02', name: 'Cắt tóc nam cao cấp',   price:  80000, type: 'SERVICE' },
-  { id: 'hair_03', name: 'Cắt tóc nữ ngắn',       price:  80000, type: 'SERVICE' },
-  { id: 'hair_04', name: 'Cắt tóc nữ dài',        price: 120000, type: 'SERVICE' },
-  { id: 'hair_05', name: 'Gội đầu dưỡng tóc',    price:  50000, type: 'SERVICE' },
-  { id: 'hair_06', name: 'Nhuộm tóc (basic)',     price: 250000, type: 'SERVICE' },
-  { id: 'hair_07', name: 'Uốn tóc',               price: 350000, type: 'SERVICE' },
-  { id: 'hair_08', name: 'Nối tóc',               price: 500000, type: 'SERVICE' },
-  { id: 'hair_09', name: 'Cắt + gội + sấy',       price: 100000, type: 'SERVICE' },
+  // ── ✂️ Tiệm cắt tóc ────────────────────────────────────────────────────────────────
+  { key: 'hair_01', name: 'Cắt tóc nam basic',     price:  50000, type: 'SERVICE' },
+  { key: 'hair_02', name: 'Cắt tóc nam cao cấp',   price:  80000, type: 'SERVICE' },
+  { key: 'hair_03', name: 'Cắt tóc nữ ngắn',       price:  80000, type: 'SERVICE' },
+  { key: 'hair_04', name: 'Cắt tóc nữ dài',        price: 120000, type: 'SERVICE' },
+  { key: 'hair_05', name: 'Gội đầu dưỡng tóc',    price:  50000, type: 'SERVICE' },
+  { key: 'hair_06', name: 'Nhuộm tóc (basic)',     price: 250000, type: 'SERVICE' },
+  { key: 'hair_07', name: 'Uốn tóc',               price: 350000, type: 'SERVICE' },
+  { key: 'hair_08', name: 'Nối tóc',               price: 500000, type: 'SERVICE' },
+  { key: 'hair_09', name: 'Cắt + gội + sấy',       price: 100000, type: 'SERVICE' },
 
-  // ── 🔧 Tiệm sửa xe ──────────────────────────────────────────────────────────
-  { id: 'bike_01', name: 'Vá xăm xe máy',         price:  20000, type: 'SERVICE' },
-  { id: 'bike_02', name: 'Vá xe không ruột',       price:  40000, type: 'SERVICE' },
-  { id: 'bike_03', name: 'Thay dầu xe máy',        price:  80000, type: 'SERVICE' },
-  { id: 'bike_04', name: 'Thay lốp xe (1 bánh)',   price: 150000, type: 'SERVICE' },
-  { id: 'bike_05', name: 'Rửa xe máy',             price:  30000, type: 'SERVICE' },
-  { id: 'bike_06', name: 'Sửa điện xe máy',        price: 100000, type: 'SERVICE' },
-  { id: 'bike_07', name: 'Thay nhớt + lọc',        price: 120000, type: 'SERVICE' },
-  { id: 'bike_08', name: 'Sạc bình ắc quy',        price:  30000, type: 'SERVICE' },
-  { id: 'bike_09', name: 'Dầu nhớt Honda',         price:  55000, type: 'PRODUCT' },
-  { id: 'bike_10', name: 'Lốp xe Michelin',        price: 320000, type: 'PRODUCT' },
-].map((item) => ({
-  ...item,
-  imageUrl: DEFAULT_IMAGE_BY_TYPE[item.type] ?? DEFAULT_ITEM_IMAGE,
-}));
+  // ── 🔧 Tiệm sửa xe ────────────────────────────────────────────────────────────
+  { key: 'bike_01', name: 'Vá xăm xe máy',         price:  20000, type: 'SERVICE' },
+  { key: 'bike_02', name: 'Vá xe không ruột',       price:  40000, type: 'SERVICE' },
+  { key: 'bike_03', name: 'Thay dầu xe máy',        price:  80000, type: 'SERVICE' },
+  { key: 'bike_04', name: 'Thay lốp xe (1 bánh)',   price: 150000, type: 'SERVICE' },
+  { key: 'bike_05', name: 'Rửa xe máy',             price:  30000, type: 'SERVICE' },
+  { key: 'bike_06', name: 'Sửa điện xe máy',        price: 100000, type: 'SERVICE' },
+  { key: 'bike_07', name: 'Thay nhớt + lọc',        price: 120000, type: 'SERVICE' },
+  { key: 'bike_08', name: 'Sạc bình ắc quy',        price:  30000, type: 'SERVICE' },
+  { key: 'bike_09', name: 'Dầu nhớt Honda',         price:  55000, type: 'PRODUCT' },
+  { key: 'bike_10', name: 'Lốp xe Michelin',        price: 320000, type: 'PRODUCT' },
+];
 
-// ─── GET /pos/items ───────────────────────────────────────────────────────────
-// Trả về toàn bộ danh mục sản phẩm. Auto-seed nếu bảng còn trống.
-export const getItems = async (req: Request, res: Response) => {
+// Build seed data gắn với một userId cụ thể
+function buildSeedItems(userId: number) {
+  return DEFAULT_ITEMS_TEMPLATE.map((item) => ({
+    id: `u${userId}_${item.key}`,          // id duy nhất theo user
+    userId,
+    name: item.name,
+    price: item.price,
+    type: item.type,
+    imageUrl: DEFAULT_IMAGE_BY_TYPE[item.type] ?? DEFAULT_ITEM_IMAGE,
+  }));
+}
+
+// ─── GET /pos/items ────────────────────────────────────────────────────────────
+// Trả về danh mục sản phẩm riêng của user đăng nhập. Auto-seed nếu user chưa có sản phẩm nào.
+export const getItems = async (req: AuthenticatedRequest, res: Response) => {
   try {
+    const userId = req.user!.id;
+
     let items = await prisma.posItem.findMany({
+      where: { userId },
       orderBy: { createdAt: 'asc' },
     });
 
     if (items.length === 0) {
-      // Seed sản phẩm mặc định cho lần đầu
-      await prisma.posItem.createMany({ data: DEFAULT_ITEMS });
-      items = await prisma.posItem.findMany({ orderBy: { createdAt: 'asc' } });
+      // Seed sản phẩm mặc định riêng cho user này
+      const seedData = buildSeedItems(userId);
+      try {
+        await prisma.posItem.createMany({ data: seedData });
+      } catch {
+        // Bỏ qua nếu seed bị trùng (ví dụ: gọi lại 2 lần đồng thời)
+      }
+      items = await prisma.posItem.findMany({ where: { userId }, orderBy: { createdAt: 'asc' } });
     }
 
     res.json({ items });
@@ -104,11 +133,12 @@ export const getItems = async (req: Request, res: Response) => {
   }
 };
 
-// ─── POST /pos/items ──────────────────────────────────────────────────────────
-// Thêm sản phẩm / dịch vụ mới vào danh mục
-export const createItem = async (req: Request, res: Response) => {
+// ─── POST /pos/items ────────────────────────────────────────────────────────────
+// Thêm sản phẩm / dịch vụ mới vào danh mục của user
+export const createItem = async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const uploadReq = req as UploadRequest;
+    const userId = req.user!.id;
+    const uploadReq = req as unknown as UploadRequest;
     const { id } = req.body as ItemBody;
 
     let normalizedItem;
@@ -119,18 +149,28 @@ export const createItem = async (req: Request, res: Response) => {
       return;
     }
 
-    if (!uploadReq.file) {
+    if (!uploadReq.file?.buffer) {
       res.status(400).json({ error: 'Vui lòng chọn hình ảnh sản phẩm.' });
+      return;
+    }
+
+    // Upload ảnh lên Cloudinary → nhận URL bền vững
+    let imageUrl: string;
+    try {
+      imageUrl = await uploadImageToCloudinary(uploadReq.file!.buffer);
+    } catch {
+      res.status(500).json({ error: 'Upload ảnh thất bại. Vui lòng thử lại.' });
       return;
     }
 
     const item = await prisma.posItem.create({
       data: {
-        id: id ?? `item_${Date.now()}`,
+        id: id ?? `u${userId}_item_${Date.now()}`,
+        userId,
         name: normalizedItem.name,
         price: normalizedItem.price,
         type: normalizedItem.type,
-        imageUrl: `/uploads/${uploadReq.file.filename}`,
+        imageUrl,
       },
     });
 
@@ -142,15 +182,21 @@ export const createItem = async (req: Request, res: Response) => {
 };
 
 // ─── PUT /pos/items/:id ──────────────────────────────────────────────────────
-// Cập nhật thông tin sản phẩm / dịch vụ trong danh mục
-export const updateItem = async (req: Request, res: Response) => {
+// Cập nhật thông tin sản phẩm của user (chỉ sửa sản phẩm thuộc về mình)
+export const updateItem = async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const uploadReq = req as UploadRequest;
+    const userId = req.user!.id;
+    const uploadReq = req as unknown as UploadRequest;
     const id = req.params['id'] as string;
 
     const existingItem = await prisma.posItem.findUnique({ where: { id } });
     if (!existingItem) {
       res.status(404).json({ error: 'Không tìm thấy sản phẩm cần cập nhật.' });
+      return;
+    }
+    // Kiểm tra quyền sở hữu
+    if (existingItem.userId !== userId) {
+      res.status(403).json({ error: 'Bạn không có quyền sửa sản phẩm này.' });
       return;
     }
 
@@ -162,13 +208,28 @@ export const updateItem = async (req: Request, res: Response) => {
       return;
     }
 
+    // Nếu có file mới → upload Cloudinary, xóa ảnh cũ (best-effort)
+    let imageUrl = existingItem.imageUrl;
+    if (uploadReq.file?.buffer) {
+      try {
+        imageUrl = await uploadImageToCloudinary(uploadReq.file.buffer);
+        // Xóa ảnh cũ trên Cloudinary (bỏ qua nếu là data URI mặc định)
+        if (existingItem.imageUrl.startsWith('https://res.cloudinary.com')) {
+          await deleteImageFromCloudinary(existingItem.imageUrl);
+        }
+      } catch {
+        res.status(500).json({ error: 'Upload ảnh thất bại. Vui lòng thử lại.' });
+        return;
+      }
+    }
+
     const item = await prisma.posItem.update({
       where: { id },
       data: {
         name: normalizedItem.name,
         price: normalizedItem.price,
         type: normalizedItem.type,
-        imageUrl: uploadReq.file ? `/uploads/${uploadReq.file.filename}` : existingItem.imageUrl,
+        imageUrl,
       },
     });
 
@@ -180,9 +241,10 @@ export const updateItem = async (req: Request, res: Response) => {
 };
 
 // ─── DELETE /pos/items/:id ───────────────────────────────────────────────────
-// Xóa sản phẩm / dịch vụ khỏi danh mục
-export const deleteItem = async (req: Request, res: Response) => {
+// Xóa sản phẩm của user (chỉ xóa sản phẩm thuộc về mình)
+export const deleteItem = async (req: AuthenticatedRequest, res: Response) => {
   try {
+    const userId = req.user!.id;
     const id = req.params['id'] as string;
 
     const existingItem = await prisma.posItem.findUnique({ where: { id } });
@@ -190,8 +252,18 @@ export const deleteItem = async (req: Request, res: Response) => {
       res.status(404).json({ error: 'Không tìm thấy sản phẩm cần xóa.' });
       return;
     }
+    // Kiểm tra quyền sở hữu
+    if (existingItem.userId !== userId) {
+      res.status(403).json({ error: 'Bạn không có quyền xóa sản phẩm này.' });
+      return;
+    }
 
     await prisma.posItem.delete({ where: { id } });
+
+    // Xóa ảnh trên Cloudinary sau khi xóa record (best-effort)
+    if (existingItem.imageUrl.startsWith('https://res.cloudinary.com')) {
+      await deleteImageFromCloudinary(existingItem.imageUrl);
+    }
 
     res.json({ message: 'Đã xóa sản phẩm thành công.' });
   } catch (err) {

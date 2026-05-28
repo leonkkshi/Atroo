@@ -1,7 +1,7 @@
 import express from 'express';
 import cors from 'cors';
-import path from 'path';
 import dotenv from 'dotenv';
+
 
 // Load variables from .env file
 dotenv.config();
@@ -27,9 +27,6 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Serve tĩnh thư mục uploads để các thiết bị mobile có thể xem ảnh hóa đơn
-const uploadsPath = path.join(__dirname, '../uploads');
-app.use('/uploads', express.static(uploadsPath));
 
 // Endpoint Health Check
 app.get('/health', (req, res) => {

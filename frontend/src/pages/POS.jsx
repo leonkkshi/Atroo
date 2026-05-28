@@ -31,7 +31,14 @@ const VIETQR_BANK_ID = {
 const TAX_RATES = { FOOD: 0.03, PRODUCT: 0.01, SERVICE: 0.05 };
 const TYPE_LABELS = { FOOD: '🍜 Đồ ăn / Nước uống', PRODUCT: '📦 Vật tư / Hàng hóa', SERVICE: '⚙️ Dịch vụ' };
 const TYPE_BADGE = { FOOD: 'badge-food', PRODUCT: 'badge-product', SERVICE: 'badge-service' };
-const FALLBACK_ITEM_IMAGE = '/uploads/pos-placeholder.svg';
+// Fallback image dùng inline SVG — hoạt động ngay cả khi không có server filesystem
+const FALLBACK_ITEM_IMAGE = `data:image/svg+xml,${encodeURIComponent(
+  '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="150" viewBox="0 0 200 150">' +
+  '<rect width="200" height="150" fill="#1C2340"/>' +
+  '<text x="100" y="95" font-size="64" text-anchor="middle" dominant-baseline="middle">📦</text>' +
+  '</svg>'
+)}`;
+
 
 // Tên hiển thị theo tab
 const TAB_CONFIG = {
@@ -53,11 +60,16 @@ function resolveItemImage(imageUrl) {
   return imageUrl.startsWith('/') ? imageUrl : `/${imageUrl}`;
 }
 
-function ItemCard({ item, inCart, onClick }) {
+function ItemCard({ item, inCart, onClick, manageMode, onEdit, onDelete }) {
   const imageSrc = resolveItemImage(item.imageUrl);
 
   return (
-    <div id={`pos-item-${item.id}`} className="pos-item-card" onClick={onClick}>
+    <div
+      id={`pos-item-${item.id}`}
+      className={`pos-item-card${manageMode ? ' manage-mode' : ''}`}
+      onClick={manageMode ? undefined : onClick}
+      style={{ position: 'relative' }}
+    >
       <div className="pos-item-media">
         <img
           className="pos-item-image"
@@ -73,25 +85,47 @@ function ItemCard({ item, inCart, onClick }) {
         <span className={`badge ${TYPE_BADGE[item.type] || 'badge-product'} pos-item-badge`} style={{ fontSize: 10, padding: '2px 7px' }}>
           {TYPE_LABELS[item.type] || item.type}
         </span>
-        {inCart && <div className="pos-item-qty-badge">{inCart.quantity}</div>}
+        {inCart && !manageMode && <div className="pos-item-qty-badge">{inCart.quantity}</div>}
       </div>
       <div className="pos-item-name">{item.name}</div>
       <div className="pos-item-price">{fmtMoney(item.price)}</div>
+
+      {manageMode && (
+        <div className="pos-item-actions">
+          <button
+            className="pos-item-action-btn edit"
+            onClick={(e) => { e.stopPropagation(); onEdit(item); }}
+            title="Chỉnh sửa"
+          >✏️</button>
+          <button
+            className="pos-item-action-btn delete"
+            onClick={(e) => { e.stopPropagation(); onDelete(item); }}
+            title="Xóa"
+          >🗑️</button>
+        </div>
+      )}
     </div>
   );
 }
 
-// ── Add item modal ────────────────────────────────────────────
-function AddItemModal({ onClose, onAdded }) {
-  const [form, setForm] = useState({ name: '', price: '', type: 'FOOD', image: null });
-  const [preview, setPreview] = useState('');
+// ── Item Form Modal (dùng chung cho Thêm & Sửa) ──────────────
+function ItemFormModal({ onClose, onSaved, editItem = null }) {
+  const isEdit = !!editItem;
+  const [form, setForm] = useState({
+    name: editItem?.name || '',
+    price: editItem?.price ? String(editItem.price) : '',
+    type: editItem?.type || 'FOOD',
+    image: null,
+  });
+  const [preview, setPreview] = useState(editItem ? resolveItemImage(editItem.imageUrl) : '');
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState('');
   const set = (k) => (e) => setForm(f => ({ ...f, [k]: e.target.value }));
 
   useEffect(() => {
     return () => {
-      if (preview) URL.revokeObjectURL(preview);
+      // Chỉ revoke nếu là blob URL mới tạo (không phải URL cũ từ server)
+      if (preview && preview.startsWith('blob:')) URL.revokeObjectURL(preview);
     };
   }, [preview]);
 
@@ -99,17 +133,20 @@ function AddItemModal({ onClose, onAdded }) {
     const file = e.target.files?.[0] || null;
     setErr('');
     setForm(f => ({ ...f, image: file }));
-    setPreview(file ? URL.createObjectURL(file) : '');
+    if (file) {
+      if (preview && preview.startsWith('blob:')) URL.revokeObjectURL(preview);
+      setPreview(URL.createObjectURL(file));
+    }
   };
 
-  const handleAdd = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     const name = form.name.trim();
     const price = Number(form.price);
 
     if (!name) { setErr('Vui lòng điền tên sản phẩm.'); return; }
     if (!Number.isFinite(price) || price <= 0) { setErr('Giá không hợp lệ.'); return; }
-    if (!form.image) { setErr('Vui lòng chọn hình ảnh sản phẩm.'); return; }
+    if (!isEdit && !form.image) { setErr('Vui lòng chọn hình ảnh sản phẩm.'); return; }
 
     setLoading(true);
     try {
@@ -117,12 +154,18 @@ function AddItemModal({ onClose, onAdded }) {
       payload.append('name', name);
       payload.append('price', String(price));
       payload.append('type', form.type);
-      payload.append('image', form.image);
+      if (form.image) payload.append('image', form.image);
 
-      const data = await posApi.createItem(payload);
-      onAdded(data.item);
+      let data;
+      if (isEdit) {
+        data = await posApi.updateItem(editItem.id, payload);
+        onSaved(data.item, 'edit');
+      } else {
+        data = await posApi.createItem(payload);
+        onSaved(data.item, 'add');
+      }
       onClose();
-    } catch (err) { setErr(err.message); }
+    } catch (e) { setErr(e.message); }
     finally { setLoading(false); }
   };
 
@@ -132,21 +175,25 @@ function AddItemModal({ onClose, onAdded }) {
       <div className="bottom-sheet">
         <div className="bottom-sheet-handle" />
         <div style={{ padding: '20px 20px 40px' }}>
-          <div className="h2 mb-4">Thêm sản phẩm / dịch vụ</div>
-          <form className="form-section" onSubmit={handleAdd}>
+          <div className="h2 mb-4">{isEdit ? '✏️ Chỉnh sửa sản phẩm' : 'Thêm sản phẩm / dịch vụ'}</div>
+          <form className="form-section" onSubmit={handleSubmit}>
             {err && <div className="error-msg">⚠️ {err}</div>}
-            <div className="input-group">
-              <label className="input-label">Hình ảnh sản phẩm</label>
-              <input className="input" type="file" accept="image/jpeg,image/jpg,image/png,image/webp,image/svg+xml" onChange={handleImageChange} />
-              <div className="pos-add-hint">Bắt buộc chọn ảnh JPG, PNG, WEBP hoặc SVG.</div>
-            </div>
-            <div className="pos-add-preview">
+
+            {/* Preview ảnh */}
+            <div className="pos-add-preview" style={{ marginBottom: 12 }}>
               {preview ? (
                 <img className="pos-add-preview-image" src={preview} alt="Xem trước ảnh sản phẩm" />
               ) : (
                 <div className="pos-add-preview-empty">Ảnh xem trước sẽ hiển thị ở đây</div>
               )}
             </div>
+
+            <div className="input-group">
+              <label className="input-label">Hình ảnh sản phẩm {isEdit && <span style={{ color: 'var(--text-2)', fontWeight: 400 }}>(để trống = giữ ảnh cũ)</span>}</label>
+              <input className="input" type="file" accept="image/jpeg,image/jpg,image/png,image/webp,image/svg+xml" onChange={handleImageChange} />
+              <div className="pos-add-hint">JPG, PNG, WEBP hoặc SVG · Tối đa 10 MB</div>
+            </div>
+
             <div className="input-group">
               <label className="input-label">Tên sản phẩm</label>
               <input className="input" placeholder="Ví dụ: Cơm đĩa bình dân" value={form.name} onChange={set('name')} />
@@ -165,10 +212,59 @@ function AddItemModal({ onClose, onAdded }) {
                 </select>
               </div>
             </div>
-            <button className="btn btn-primary w-full" type="submit" disabled={loading}>
-              {loading ? 'Đang thêm...' : '+ Thêm sản phẩm'}
-            </button>
+
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button className="btn btn-ghost w-full" type="button" onClick={onClose} disabled={loading}>Huỷ</button>
+              <button className="btn btn-primary w-full" type="submit" disabled={loading}>
+                {loading ? (isEdit ? 'Đang lưu...' : 'Đang thêm...') : (isEdit ? '💾 Lưu thay đổi' : '+ Thêm sản phẩm')}
+              </button>
+            </div>
           </form>
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ── Delete Confirm Modal ───────────────────────────────────────
+function DeleteConfirmModal({ item, onClose, onDeleted }) {
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState('');
+
+  const handleDelete = async () => {
+    setLoading(true);
+    try {
+      await posApi.deleteItem(item.id);
+      onDeleted(item.id);
+      onClose();
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <>
+      <div className="backdrop" onClick={onClose} style={{ zIndex: 110 }} />
+      <div className="modal" style={{ zIndex: 111 }}>
+        <div className="modal-inner" style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: 48, marginBottom: 12 }}>🗑️</div>
+          <div className="h2 mb-2">Xóa sản phẩm?</div>
+          <div className="body mb-1" style={{ color: 'var(--text-1)', fontWeight: 600 }}>{item.name}</div>
+          <div className="body mb-4" style={{ color: 'var(--text-2)', fontSize: 13 }}>Hành động này không thể hoàn tác. Sản phẩm sẽ bị xóa vĩnh viễn khỏi danh mục.</div>
+          {err && <div className="error-msg mb-3">⚠️ {err}</div>}
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button className="btn btn-ghost w-full" onClick={onClose} disabled={loading}>Huỷ</button>
+            <button
+              className="btn w-full"
+              style={{ background: 'var(--danger)', color: '#fff', height: 52, borderRadius: 14, fontFamily: 'Syne, sans-serif', fontWeight: 700 }}
+              onClick={handleDelete}
+              disabled={loading}
+            >
+              {loading ? 'Đang xóa...' : '🗑️ Xóa ngay'}
+            </button>
+          </div>
         </div>
       </div>
     </>
@@ -590,10 +686,13 @@ export default function POS() {
   const [cart, setCart] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showCart, setShowCart] = useState(false);
-  const [showAdd, setShowAdd] = useState(false);
+  const [showItemForm, setShowItemForm] = useState(false); // null | 'add' | item-object
   const [tab, setTab] = useState('ALL');
   const [search, setSearch] = useState('');
   const [bankProfile, setBankProfile] = useState(null);
+  const [manageMode, setManageMode] = useState(false);
+  const [editingItem, setEditingItem] = useState(null);   // item to edit
+  const [deletingItem, setDeletingItem] = useState(null); // item to delete
 
   // States cho Quản lý Lịch sử
   const [view, setView] = useState('sales'); // 'sales' | 'history'
@@ -653,6 +752,22 @@ export default function POS() {
     setCart([]);
   };
 
+  const handleItemSaved = (savedItem, mode) => {
+    if (mode === 'edit') {
+      setItems(prev => prev.map(it => it.id === savedItem.id ? savedItem : it));
+    } else {
+      setItems(prev => [...prev, savedItem]);
+    }
+    setEditingItem(null);
+  };
+
+  const handleItemDeleted = (id) => {
+    setItems(prev => prev.filter(it => it.id !== id));
+    // Xóa khỏi giỏ hàng nếu đang có
+    setCart(prev => prev.filter(c => c.id !== id));
+    setDeletingItem(null);
+  };
+
   const TABS = ['ALL', 'FOOD', 'SERVICE', 'PRODUCT'];
 
   const filtered = items.filter(it => {
@@ -682,15 +797,25 @@ export default function POS() {
             {view === 'sales' ? 'Chọn sản phẩm để thêm vào giỏ' : 'Xem danh sách và in lại hóa đơn đã bán'}
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 10 }}>
+        <div style={{ display: 'flex', gap: 8 }}>
           {view === 'sales' ? (
             <>
               <button id="view-history-btn" className="btn btn-ghost btn-sm" onClick={() => { setView('history'); loadHistory(); }}>
                 📄 Lịch sử
               </button>
-              <button id="add-item-btn" className="btn btn-ghost btn-sm" onClick={() => setShowAdd(true)}>
-                + Thêm SP
+              <button
+                id="manage-items-btn"
+                className={`btn btn-sm ${manageMode ? 'btn-primary' : 'btn-ghost'}`}
+                onClick={() => setManageMode(m => !m)}
+                style={manageMode ? { background: 'var(--amber)', color: '#0A0E1A' } : {}}
+              >
+                {manageMode ? '✓ Xong' : '⚙️ Quản lý'}
               </button>
+              {!manageMode && (
+                <button id="add-item-btn" className="btn btn-ghost btn-sm" onClick={() => setShowItemForm('add')}>
+                  + Thêm SP
+                </button>
+              )}
             </>
           ) : (
             <button id="view-sales-btn" className="btn btn-primary btn-sm" onClick={() => setView('sales')}>
@@ -723,6 +848,12 @@ export default function POS() {
           </div>
 
           {/* Product grid */}
+          {manageMode && (
+            <div style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)', borderRadius: 12, padding: '10px 14px', marginBottom: 12, fontSize: 13, color: 'var(--amber)', display: 'flex', alignItems: 'center', gap: 8 }}>
+              ⚙️ Chế độ quản lý — nhấn ✏️ để sửa, 🗑️ để xóa. Nhấn <strong>✓ Xong</strong> để thoát.
+            </div>
+          )}
+
           {loading ? (
             <div className="pos-grid">
               {[1,2,3,4,5,6].map(i => (
@@ -734,7 +865,7 @@ export default function POS() {
               <div className="empty-icon">📦</div>
               <div className="empty-title">Không có sản phẩm</div>
               <div className="empty-body">Thêm món ăn, dịch vụ cắt tóc hoặc dịch vụ sửa xe.</div>
-              <button className="btn btn-primary btn-sm mt-3" onClick={() => setShowAdd(true)}>+ Thêm ngay</button>
+              <button className="btn btn-primary btn-sm mt-3" onClick={() => setShowItemForm('add')}>+ Thêm ngay</button>
             </div>
           ) : groupedForDisplay ? (
             // Hiển thị theo nhóm khi tab=ALL
@@ -749,7 +880,17 @@ export default function POS() {
                   <div className="pos-grid">
                     {group.items.map(item => {
                       const inCart = cart.find(c => c.id === item.id);
-                      return <ItemCard key={item.id} item={item} inCart={inCart} onClick={() => addToCart(item)} />;
+                      return (
+                        <ItemCard
+                          key={item.id}
+                          item={item}
+                          inCart={inCart}
+                          onClick={() => addToCart(item)}
+                          manageMode={manageMode}
+                          onEdit={setEditingItem}
+                          onDelete={setDeletingItem}
+                        />
+                      );
                     })}
                   </div>
                 </div>
@@ -759,7 +900,17 @@ export default function POS() {
             <div className="pos-grid">
               {filtered.map(item => {
                 const inCart = cart.find(c => c.id === item.id);
-                return <ItemCard key={item.id} item={item} inCart={inCart} onClick={() => addToCart(item)} />;
+                return (
+                  <ItemCard
+                    key={item.id}
+                    item={item}
+                    inCart={inCart}
+                    onClick={() => addToCart(item)}
+                    manageMode={manageMode}
+                    onEdit={setEditingItem}
+                    onDelete={setDeletingItem}
+                  />
+                );
               })}
             </div>
           )}
@@ -825,7 +976,20 @@ export default function POS() {
       )}
 
       {/* Modals */}
-      {showAdd && <AddItemModal onClose={() => setShowAdd(false)} onAdded={item => setItems(prev => [...prev, item])} />}
+      {(showItemForm === 'add' || editingItem) && (
+        <ItemFormModal
+          editItem={editingItem || null}
+          onClose={() => { setShowItemForm(false); setEditingItem(null); }}
+          onSaved={handleItemSaved}
+        />
+      )}
+      {deletingItem && (
+        <DeleteConfirmModal
+          item={deletingItem}
+          onClose={() => setDeletingItem(null)}
+          onDeleted={handleItemDeleted}
+        />
+      )}
       {showCart && (
         <CartSheet
           cart={cart}

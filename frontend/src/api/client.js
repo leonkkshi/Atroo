@@ -55,6 +55,11 @@ export const posApi = {
     const body = item instanceof FormData ? item : JSON.stringify(item);
     return request('/pos/items', { method: 'POST', body });
   },
+  updateItem: (id, formData) => {
+    const body = formData instanceof FormData ? formData : JSON.stringify(formData);
+    return request(`/pos/items/${id}`, { method: 'PUT', body });
+  },
+  deleteItem: (id) => request(`/pos/items/${id}`, { method: 'DELETE' }),
   createInvoice: (invoice) => request('/pos/invoices', { method: 'POST', body: JSON.stringify(invoice) }),
   getInvoices: (limit = 50) => request(`/pos/invoices?limit=${limit}`),
   getExpenses: () => request('/pos/expenses'),

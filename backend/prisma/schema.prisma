@@ -25,6 +25,7 @@ model User {
   deadlines        Deadline[]
   posInvoices      PosInvoice[]
   posExpenses      PosExpense[]
+  posItems         PosItem[]
 }
 
 model TaxDeclaration {
@@ -84,13 +85,15 @@ model Deadline {
 
 // ─── POS Module ───────────────────────────────────────────────────────────────
 
-// Danh mục sản phẩm / dịch vụ (dùng chung cho mọi user, seed tự động)
+// Danh mục sản phẩm / dịch vụ riêng của từng user
 model PosItem {
   id        String   @id
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   name      String
   price     Float
   type      String   // "FOOD" | "PRODUCT" | "SERVICE"
-  imageUrl  String   @default("/uploads/pos-placeholder.svg")
+  imageUrl  String   @default("")
   createdAt DateTime @default(now())
 }
 

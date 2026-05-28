@@ -19,6 +19,9 @@ model User {
   bankAccountName  String?
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
+  businessType     String?          @default("3") // "1" | "2" | "3" | "4" (ratios for VAT + TNCN)
+  revenueGoal      Float?           @default(0)   // monthly revenue goal
+  staffSize        Int?             @default(0)   // employee scale
   declarations     TaxDeclaration[]
   invoices         Invoice[]
   chatMessages     ChatMessage[]

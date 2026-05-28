@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { posApi } from '../api/client';
 import { calendarApi } from '../api/client';
 import { fmtMoney, fmtDate, fmtTime, daysUntil, formatDaysLabel, animateCountUp } from '../utils/format';
+import { useAuth } from '../store/authStore';
 import {
   Chart as ChartJS,
   CategoryScale, LinearScale, BarElement, LineElement,
@@ -65,6 +66,7 @@ function DeadlineMini({ d }) {
 }
 
 export default function Dashboard() {
+  const { user } = useAuth();
   const [invoices, setInvoices] = useState([]);
   const [deadlines, setDeadlines] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -171,6 +173,51 @@ export default function Dashboard() {
           </>
         )}
       </div>
+
+      {/* Monthly Revenue Goal Tracker Card */}
+      {!loading && user?.revenueGoal > 0 && (() => {
+        const goalVal = user.revenueGoal;
+        const percent = Math.min(Math.round((monthRevenue / goalVal) * 100), 100);
+        return (
+          <div className="card mb-6 animate-fade-in" style={{
+            background: 'linear-gradient(135deg, rgba(0, 229, 160, 0.05) 0%, rgba(28, 35, 64, 0.8) 100%)',
+            border: '1px solid rgba(0, 229, 160, 0.25)',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.15)',
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+              <div>
+                <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--text-2)' }}>
+                  🎯 Mục tiêu doanh thu tháng
+                </span>
+                <div style={{ fontFamily: 'Syne, sans-serif', fontSize: 18, fontWeight: 700, color: 'var(--text-1)', marginTop: 2 }}>
+                  {new Intl.NumberFormat('vi-VN').format(monthRevenue)} ₫ <span style={{ fontSize: 13, fontWeight: 400, color: 'var(--text-2)' }}>/ {new Intl.NumberFormat('vi-VN').format(goalVal)} ₫</span>
+                </div>
+              </div>
+              <div style={{
+                fontFamily: 'Syne, sans-serif', fontSize: 24, fontWeight: 800, color: 'var(--accent)',
+                background: 'var(--accent-dim)', padding: '6px 12px', borderRadius: 12, border: '1px solid rgba(0, 229, 160, 0.15)'
+              }}>
+                {percent}%
+              </div>
+            </div>
+            
+            <div style={{
+              width: '100%', height: 10, background: 'rgba(255,255,255,0.06)', borderRadius: 5, overflow: 'hidden',
+              position: 'relative', border: '1px solid var(--border)'
+            }}>
+              <div style={{
+                width: `${percent}%`, height: '100%', background: 'linear-gradient(90deg, var(--accent) 0%, var(--cyan) 100%)',
+                borderRadius: 5, transition: 'width 800ms cubic-bezier(0.4, 0, 0.2, 1)',
+                boxShadow: '0 0 12px rgba(0, 229, 160, 0.4)'
+              }} />
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--text-2)', marginTop: 8, display: 'flex', justifyContent: 'space-between' }}>
+              <span>Đạt {percent}% chỉ tiêu tháng này</span>
+              <span>Còn lại {new Intl.NumberFormat('vi-VN').format(Math.max(0, goalVal - monthRevenue))} ₫</span>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Chart */}
       <div className="chart-container mb-6">

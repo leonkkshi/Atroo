@@ -32,10 +32,30 @@ const VIETQR_BANK_ID = {
   'VIB': 'VIB',
 };
 
+const BIZ_TYPES = [
+  { value: '1', label: '🍜 Phân phối, cung cấp hàng hóa (Đại lý, tạp hóa...)' },
+  { value: '2', label: '✂️ Dịch vụ thuần túy (Tiệm tóc, sửa xe, giặt ủi...)' },
+  { value: '3', label: '🍔 Sản xuất, vận tải, ăn uống (Quán cơm, bún phở...)' },
+  { value: '4', label: '🌀 Hoạt động kinh doanh khác' },
+];
+
+const BIZ_ICONS = {
+  '1': '🛒',
+  '2': '✂️',
+  '3': '🍔',
+  '4': '💼'
+};
+
+const BIZ_LABELS = {
+  '1': 'Thương mại & Bán lẻ',
+  '2': 'Dịch vụ thuần túy',
+  '3': 'Sản xuất & Ăn uống',
+  '4': 'Hoạt động Khác'
+};
 
 function SectionCard({ icon, title, children }) {
   return (
-    <div className="card" style={{ marginBottom: 16 }}>
+    <div className="card card--accent" style={{ marginBottom: 16, transition: 'all var(--dur-comp) var(--ease)' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
         <span style={{ fontSize: 20 }}>{icon}</span>
         <span style={{ fontFamily: 'Syne, Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: 'var(--text-1)' }}>
@@ -92,6 +112,9 @@ export default function Settings() {
     bankName: '',
     bankAccount: '',
     bankAccountName: '',
+    businessType: '3',
+    revenueGoal: '',
+    staffSize: '',
   });
 
   // Password state
@@ -114,6 +137,8 @@ export default function Settings() {
   useEffect(() => {
     authApi.profile()
       .then(data => {
+        // Cập nhật context user đầy đủ thông tin từ DB để kích hoạt các trường như createdAt
+        updateUser(data, token);
         setForm({
           businessName: data.businessName || '',
           phone: data.phone || '',
@@ -121,12 +146,26 @@ export default function Settings() {
           bankName: data.bankName || '',
           bankAccount: data.bankAccount || '',
           bankAccountName: data.bankAccountName || '',
+          businessType: data.businessType || '3',
+          revenueGoal: data.revenueGoal != null ? data.revenueGoal.toString() : '',
+          staffSize: data.staffSize != null ? data.staffSize.toString() : '',
         });
       })
       .catch(() => {
         // fallback từ localStorage
         if (user) {
-          setForm(f => ({ ...f, businessName: user.businessName || '' }));
+          setForm(f => ({
+            ...f,
+            businessName: user.businessName || '',
+            phone: user.phone || '',
+            address: user.address || '',
+            bankName: user.bankName || '',
+            bankAccount: user.bankAccount || '',
+            bankAccountName: user.bankAccountName || '',
+            businessType: user.businessType || '3',
+            revenueGoal: user.revenueGoal != null ? user.revenueGoal.toString() : '',
+            staffSize: user.staffSize != null ? user.staffSize.toString() : '',
+          }));
         }
       })
       .finally(() => setFetchLoading(false));
@@ -142,11 +181,8 @@ export default function Settings() {
     setLoading(true);
     try {
       const res = await authApi.updateProfile(form);
-      // Cập nhật lại context user để sidebar hiển thị đúng
-      updateUser(
-        { ...(user || {}), businessName: res.user.businessName, taxCode: res.user.taxCode },
-        token
-      );
+      // Cập nhật lại context user đầy đủ từ phản hồi trả về của backend
+      updateUser(res.user, token);
       showToast('Đã lưu thông tin thành công!');
     } catch (err) {
       showToast(err.message || 'Lưu thất bại.', 'error');
@@ -201,6 +237,28 @@ export default function Settings() {
         </div>
       </div>
 
+      {/* Brand Identity Card */}
+      {user && (
+        <div className="card card--accent" style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 20, background: 'linear-gradient(135deg, var(--surface) 0%, rgba(28, 35, 64, 0.6) 100%)', borderLeft: '3px solid var(--accent)' }}>
+          <div style={{
+            width: 56, height: 56, borderRadius: '50%', background: 'var(--accent-dim)',
+            border: '2px solid var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 24, flexShrink: 0, boxShadow: '0 4px 16px rgba(0, 229, 160, 0.15)'
+          }}>
+            {BIZ_ICONS[user?.businessType] || '🏪'}
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontFamily: 'Syne, sans-serif', fontSize: 18, fontWeight: 700, color: 'var(--text-1)' }}>
+              {user?.businessName || 'Cửa hàng của tôi'}
+            </div>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 4 }}>
+              <span className="badge badge-submitted" style={{ fontSize: 9 }}>MST: {user?.taxCode}</span>
+              <span className="badge badge-vat" style={{ fontSize: 9 }}>{BIZ_LABELS[user?.businessType] || 'Hộ kinh doanh'}</span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Thông tin cơ bản (read-only) */}
       <SectionCard icon="🪪" title="Tài khoản">
         <div style={{ display: 'grid', gap: 12 }}>
@@ -208,6 +266,12 @@ export default function Settings() {
             <span style={{ fontSize: 13, color: 'var(--text-2)' }}>Mã số thuế</span>
             <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, color: 'var(--accent)', letterSpacing: '0.05em' }}>
               {user?.taxCode || '—'}
+            </span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: 'var(--bg)', borderRadius: 12 }}>
+            <span style={{ fontSize: 13, color: 'var(--text-2)' }}>Địa chỉ đăng ký</span>
+            <span style={{ fontSize: 13, color: 'var(--text-1)', textAlign: 'right' }}>
+              {user?.address || '—'}
             </span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: 'var(--bg)', borderRadius: 12 }}>
@@ -246,6 +310,48 @@ export default function Settings() {
               value={form.address}
               onChange={set('address')}
               placeholder="123 Đường Lê Lợi, Quận 1, TP.HCM"
+            />
+          </div>
+        </SectionCard>
+
+        {/* Thông tin hoạt động kinh doanh */}
+        <SectionCard icon="📊" title="Thông tin hoạt động kinh doanh">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div className="input-group">
+              <label className="input-label" htmlFor="settings-biz-type">Lĩnh vực hoạt động chính</label>
+              <select
+                id="settings-biz-type"
+                className="input"
+                value={form.businessType}
+                onChange={set('businessType')}
+              >
+                {BIZ_TYPES.map(bt => (
+                  <option key={bt.value} value={bt.value}>{bt.label}</option>
+                ))}
+              </select>
+              <div style={{ fontSize: 11, color: 'var(--text-2)', marginTop: 2 }}>
+                Lĩnh vực này sẽ mặc định tính tỷ lệ thuế GTGT & TNCN tương ứng trên trang Thuế.
+              </div>
+            </div>
+
+            <InputField
+              id="settings-revenue-goal"
+              label="Mục tiêu doanh thu hàng tháng (₫)"
+              type="number"
+              value={form.revenueGoal}
+              onChange={set('revenueGoal')}
+              placeholder="Ví dụ: 100000000"
+              hint="Giúp theo dõi tiến trình thực tế bán hàng so với mục tiêu trên màn hình Tổng quan."
+            />
+
+            <InputField
+              id="settings-staff-size"
+              label="Quy mô nhân sự (số lượng nhân viên)"
+              type="number"
+              value={form.staffSize}
+              onChange={set('staffSize')}
+              placeholder="Ví dụ: 3"
+              hint="Khai báo quy mô lao động sử dụng thực tế của hộ kinh doanh."
             />
           </div>
         </SectionCard>

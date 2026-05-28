@@ -108,7 +108,10 @@ export const getProfile = async (req: any, res: Response) => {
         bankName: true,
         bankAccount: true,
         bankAccountName: true,
-        createdAt: true
+        createdAt: true,
+        businessType: true,
+        revenueGoal: true,
+        staffSize: true
       }
     });
 
@@ -125,7 +128,7 @@ export const getProfile = async (req: any, res: Response) => {
 export const updateProfile = async (req: any, res: Response) => {
   try {
     const userId = req.user.id;
-    const { businessName, phone, address, bankName, bankAccount, bankAccountName, currentPassword, newPassword } = req.body;
+    const { businessName, phone, address, bankName, bankAccount, bankAccountName, currentPassword, newPassword, businessType, revenueGoal, staffSize } = req.body;
 
     // Validation cơ bản
     if (!businessName || !businessName.trim()) {
@@ -139,6 +142,9 @@ export const updateProfile = async (req: any, res: Response) => {
       bankName: bankName?.trim() || null,
       bankAccount: bankAccount?.trim() || null,
       bankAccountName: bankAccountName?.trim() || null,
+      businessType: businessType?.trim() || null,
+      revenueGoal: revenueGoal != null && revenueGoal !== '' && !isNaN(parseFloat(revenueGoal)) ? parseFloat(revenueGoal) : null,
+      staffSize: staffSize != null && staffSize !== '' && !isNaN(parseInt(staffSize)) ? parseInt(staffSize) : null,
     };
 
     // Đổi mật khẩu nếu có
@@ -172,7 +178,10 @@ export const updateProfile = async (req: any, res: Response) => {
         bankName: true,
         bankAccount: true,
         bankAccountName: true,
-        createdAt: true
+        createdAt: true,
+        businessType: true,
+        revenueGoal: true,
+        staffSize: true
       }
     });
 

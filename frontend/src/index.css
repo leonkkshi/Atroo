@@ -82,20 +82,13 @@ h1, h2, h3, h4, h5 {
 .sidebar {
   width: 240px;
   flex-shrink: 0;
-  display: none;
-}
-@media (min-width: 1024px) {
-  .sidebar { display: flex; flex-direction: column; }
-  .main-content { margin-left: 0; }
-  .bottom-nav { display: none; }
+  display: flex;
+  flex-direction: column;
 }
 .main-content {
   flex: 1;
   min-width: 0;
-  padding-bottom: 80px; /* bottom nav clearance */
-}
-@media (min-width: 1024px) {
-  .main-content { padding-bottom: 0; }
+  padding-bottom: 0;
 }
 .page-container {
   padding: var(--py) var(--px);
@@ -1501,3 +1494,377 @@ button, a, [role="button"] { min-height: 44px; }
   70% { box-shadow: 0 0 0 6px rgba(0, 229, 160, 0); }
   100% { box-shadow: 0 0 0 0 rgba(0, 229, 160, 0); }
 }
+
+/* ── Premium Auth Page Enhancements (TAXAI Rules) ──────────────── */
+.auth-page {
+  position: relative;
+  overflow: hidden;
+  background: radial-gradient(circle at 10% 20%, rgba(28, 35, 64, 0.2) 0%, rgba(10, 14, 26, 1) 90.2%);
+}
+
+/* Beautiful AI dynamic mesh/wavy shapes in background */
+.auth-bg-decorations {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.auth-bg-mesh {
+  position: absolute;
+  width: 600px;
+  height: 600px;
+  background: radial-gradient(circle, rgba(0, 229, 160, 0.05) 0%, rgba(0, 196, 255, 0.02) 50%, transparent 100%);
+  filter: blur(80px);
+  top: -200px;
+  right: -200px;
+}
+
+.auth-bg-mesh-2 {
+  position: absolute;
+  width: 500px;
+  height: 500px;
+  background: radial-gradient(circle, rgba(0, 229, 160, 0.04) 0%, rgba(28, 35, 64, 0.2) 60%, transparent 100%);
+  filter: blur(60px);
+  bottom: -150px;
+  left: -150px;
+}
+
+.auth-bg-waves {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  opacity: 0.03;
+  color: var(--accent);
+}
+
+.auth-card-wrapper {
+  position: relative;
+  z-index: 10;
+  width: 100%;
+  max-width: 420px;
+}
+
+/* Auth card entrance animation (Rule R23, R22) */
+.auth-card-animate {
+  animation: authCardEntrance 350ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+@keyframes authCardEntrance {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Premium Inputs with Inline SVG Icons */
+.input-icon-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.input-icon {
+  position: absolute;
+  left: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 20px;
+  height: 20px;
+  color: var(--text-2);
+  transition: color var(--dur-micro) var(--ease);
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.input-icon-wrapper .input {
+  padding-left: 48px;
+}
+
+.input-icon-wrapper .input:focus + .input-icon {
+  color: var(--accent);
+}
+
+
+/* Secondary links action scale */
+.auth-link-premium {
+  color: var(--accent);
+  font-weight: 500;
+  cursor: pointer;
+  display: inline-block;
+  transition: transform var(--dur-micro) var(--ease), color var(--dur-micro) var(--ease);
+}
+
+.auth-link-premium:hover {
+  color: var(--cyan);
+  text-decoration: none;
+}
+
+.auth-link-premium:active {
+  transform: scale(0.96);
+}
+
+/* ── Figma Premium Dark Glassmorphism Theme (TAXAI Rules) ──────────────────────────── */
+.figma-auth-page {
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  position: relative;
+  overflow: hidden;
+  background: radial-gradient(circle at 50% 50%, #1A2342 0%, #0A0E1A 100%);
+  z-index: 1;
+}
+
+/* Vibrant glowing backlight behind the login card to lift the gloomy feel */
+.figma-auth-page::before {
+  content: '';
+  position: absolute;
+  width: 500px;
+  height: 500px;
+  background: radial-gradient(circle, rgba(0, 229, 160, 0.12) 0%, rgba(0, 196, 255, 0.06) 50%, transparent 80%);
+  filter: blur(60px);
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* Abstract wave/shape decorations in background */
+.figma-bg-wave-1 {
+  position: absolute;
+  width: 900px;
+  height: 900px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(0, 229, 160, 0.16) 0%, rgba(0, 196, 255, 0.04) 50%, transparent 100%);
+  top: -300px;
+  left: -200px;
+  pointer-events: none;
+  z-index: 2;
+  filter: blur(80px);
+}
+
+.figma-bg-wave-2 {
+  position: absolute;
+  width: 800px;
+  height: 800px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(0, 196, 255, 0.14) 0%, rgba(28, 35, 64, 0.2) 60%, transparent 100%);
+  bottom: -200px;
+  right: -100px;
+  pointer-events: none;
+  z-index: 2;
+  filter: blur(80px);
+}
+
+.figma-bg-wavy-lines {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0.15;
+  color: #00E5A0;
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* Glassmorphic card matching Figma exactly */
+.figma-auth-card {
+  width: 100%;
+  max-width: 440px;
+  background: rgba(255, 255, 255, 0.45);
+  backdrop-filter: blur(28px) saturate(140%);
+  -webkit-backdrop-filter: blur(28px) saturate(140%);
+  border: 1px solid rgba(255, 255, 255, 0.65);
+  border-radius: 32px;
+  padding: 48px 40px;
+  box-shadow: 0 20px 50px rgba(15, 60, 95, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  z-index: 10;
+  position: relative;
+  transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Entrance animation */
+.figma-auth-card-animate {
+  animation: figmaCardEntrance 350ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+@keyframes figmaCardEntrance {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.figma-logo-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.figma-logo-text {
+  font-family: 'Syne', sans-serif;
+  font-size: 32px;
+  font-weight: 800;
+  color: #0F3C5F;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  line-height: 1;
+}
+
+.figma-logo-sub {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  color: #0F3C5F;
+  text-align: center;
+  margin-top: 4px;
+}
+
+.figma-title {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 22px;
+  font-weight: 700;
+  color: #0F3C5F;
+  margin-top: 36px;
+  margin-bottom: 32px;
+  text-align: center;
+  letter-spacing: -0.02em;
+}
+
+/* Light sky inputs */
+.figma-input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.figma-label {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  color: #1E293B;
+  text-align: left;
+}
+
+.figma-input {
+  width: 100%;
+  height: 52px;
+  background: #D9EAF8;
+  border: 1px solid rgba(15, 60, 95, 0.04);
+  border-radius: 16px;
+  padding: 0 20px;
+  font-size: 15px;
+  color: #0F3C5F;
+  font-weight: 500;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.figma-input::placeholder {
+  color: #8FAEC6;
+  opacity: 0.9;
+}
+
+.figma-input:focus {
+  background: #E5F2FF;
+  border-color: rgba(0, 145, 255, 0.4);
+  box-shadow: 0 0 0 4px rgba(0, 145, 255, 0.1);
+}
+
+.figma-input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* White-sky Capsule CTA Button */
+.figma-btn-primary {
+  width: 100%;
+  height: 52px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(240, 249, 255, 0.8) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  border-radius: 999px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  color: #0091FF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 20px rgba(15, 60, 95, 0.05), inset 0 1px 0 #FFFFFF;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  margin-top: 24px;
+}
+
+.figma-btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 24px rgba(15, 60, 95, 0.08);
+  background: #FFFFFF;
+}
+
+.figma-btn-primary:active {
+  transform: scale(0.96) translateY(0);
+  box-shadow: 0 4px 10px rgba(15, 60, 95, 0.04);
+}
+
+.figma-btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+/* Footer & links */
+.figma-footer {
+  text-align: center;
+  margin-top: 24px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 14px;
+  color: #1E293B;
+  font-weight: 500;
+}
+
+.figma-link {
+  color: #0091FF;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+
+.figma-link:hover {
+  opacity: 0.8;
+  text-decoration: underline;
+}
+
+/* Error message styled for Light Glass theme */
+.figma-error-msg {
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: 14px;
+  padding: 12px 16px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  color: #DC2626;
+  text-align: left;
+  margin-bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+

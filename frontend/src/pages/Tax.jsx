@@ -11,33 +11,34 @@ const TAX_TYPES = [
 ];
 
 // Gợi ý ngành nghề theo 3 loại hình mục tiêu
+// Tax-rule: Quán ăn → SX+hàng hóa (VAT 3%, TNCN 1.5%); Tiệm tóc/Sửa xe → Dịch vụ (VAT 5%, TNCN 2%)
 const BIZ_PRESETS = [
   {
     key: 'food',
     icon: '🍜',
     label: 'Quán ăn',
     desc: 'Cơm bụi, bún phở...',
-    bizType: '3', // Sản xuất, ăn uống
+    bizType: '3', // Sản xuất, ăn uống — VAT 3%, TNCN 1.5%
     taxType: 'HKD',
-    hint: 'VAT 3% + TNCN 1.5% trên doanh thu',
+    hint: 'VAT 3% + TNCN 1.5% · miễn thuế nếu DT ≤ 500 triệu',
   },
   {
     key: 'hair',
     icon: '✂️',
     label: 'Tiệm tóc',
     desc: 'Cắt tóc, salon...',
-    bizType: '2', // Dịch vụ
+    bizType: '2', // Dịch vụ thuần túy — VAT 5%, TNCN 2%
     taxType: 'HKD',
-    hint: 'VAT 5% + TNCN 2% trên doanh thu',
+    hint: 'VAT 5% + TNCN 2% · miễn thuế nếu DT ≤ 500 triệu',
   },
   {
     key: 'bike',
     icon: '🔧',
     label: 'Sửa xe',
     desc: 'Sửa xe máy, garage...',
-    bizType: '2', // Dịch vụ
+    bizType: '2', // Dịch vụ thuần túy — VAT 5%, TNCN 2%
     taxType: 'HKD',
-    hint: 'VAT 5% + TNCN 2% trên doanh thu',
+    hint: 'VAT 5% + TNCN 2% · miễn thuế nếu DT ≤ 500 triệu',
   },
 ];
 
@@ -380,7 +381,7 @@ export default function Tax() {
                   <div className="step-content">
                     <div className="step-title">4. Kiểm tra miễn thuế</div>
                     <div className="step-desc">
-                      {stepperIndex >= 3 ? (stepperData?.isExempt ? '🎉 Doanh thu dưới 100M/năm: MIỄN THUẾ!' : 'Doanh thu > 100M/năm: Không được miễn thuế.') : 'Đang kiểm tra ngưỡng doanh thu...'}
+                      {stepperIndex >= 3 ? (stepperData?.isExempt ? '🎉 Doanh thu ≤ 500 triệu/năm: MIỄN THUẾ!' : `Doanh thu > 500 triệu/năm → Nhóm ${stepperData?.revenueGroup || 2}: Tính thuế.`) : 'Đang kiểm tra ngưỡng doanh thu 500 triệu...'}
                     </div>
                   </div>
                 </div>
@@ -391,7 +392,7 @@ export default function Tax() {
                   <div className="step-content">
                     <div className="step-title">5. Tính GTGT</div>
                     <div className="step-desc">
-                      {stepperIndex >= 4 ? (stepperData?.isExempt ? 'GTGT phải nộp: 0 ₫' : `Doanh thu × VATRate = ${fmtMoney(stepperData?.vatAmount)}`) : 'Đang tính toán thuế GTGT...'}
+                      {stepperIndex >= 4 ? (stepperData?.isExempt ? 'GTGT phải nộp: 0 ₫' : `Doanh thu × VAT% = ${fmtMoney(stepperData?.vatAmount)}`) : 'Đang tính toán thuế GTGT...'}
                     </div>
                   </div>
                 </div>
@@ -402,7 +403,7 @@ export default function Tax() {
                   <div className="step-content">
                     <div className="step-title">6. Tính TNCN</div>
                     <div className="step-desc">
-                      {stepperIndex >= 5 ? (stepperData?.isExempt ? 'TNCN phải nộp: 0 ₫' : `Doanh thu × TNCNRate = ${fmtMoney(stepperData?.tncnAmount)}`) : 'Đang tính toán thuế TNCN...'}
+                      {stepperIndex >= 5 ? (stepperData?.isExempt ? 'TNCN phải nộp: 0 ₫' : stepperData?.revenueGroup === 1 ? 'Miễn TNCN' : `(DT - 500 triệu) × TNCN% = ${fmtMoney(stepperData?.tncnAmount)}`) : 'Đang tính toán thuế TNCN...'}
                     </div>
                   </div>
                 </div>
@@ -442,7 +443,7 @@ export default function Tax() {
 
               {isExempt ? (
                 <div className="alert alert-success mb-3">
-                  🎉 <strong>Được miễn thuế!</strong> Doanh thu năm dưới ngưỡng chịu thuế theo Thông tư 40/2021/TT-BTC (≤ 100.000.000 ₫).
+                  🎉 <strong>Được miễn thuế!</strong> Doanh thu năm ≤ 500.000.000 ₫ thuộc diện miễn thuế VAT và TNCN theo Thông tư 40/2021/TT-BTC. Kê khai doanh thu 1 lần trước 31/1 năm sau.
                 </div>
               ) : (
                 <>
@@ -454,6 +455,19 @@ export default function Tax() {
               )}
 
               <div className="divider" style={{ margin: '16px 0' }} />
+
+              {/* Nhóm doanh thu */}
+              {result.revenueGroup && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 10 }}>
+                  <span style={{ color: 'var(--text-2)' }}>Nhóm doanh thu</span>
+                  <span style={{ color: 'var(--amber)', fontWeight: 600 }}>
+                    {result.revenueGroup === 1 && 'Nhóm 1 — ≤ 500 triệu'}
+                    {result.revenueGroup === 2 && 'Nhóm 2 — 500 triệu → 3 tỷ'}
+                    {result.revenueGroup === 3 && 'Nhóm 3 — 3 tỷ → 50 tỷ'}
+                    {result.revenueGroup === 4 && 'Nhóm 4 — > 50 tỷ'}
+                  </span>
+                </div>
+              )}
 
               <div className="tax-detail-row" style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 8 }}>
                 <span className="tax-detail-label" style={{ color: 'var(--text-2)' }}>Doanh thu</span>
@@ -471,7 +485,12 @@ export default function Tax() {
                   </div>
                   <div className="card" style={{ borderTop: '2px solid var(--accent)', background: 'rgba(10, 14, 26, 0.4)', padding: 12, borderRadius: 14 }}>
                     <div style={{ fontSize: 11, color: 'var(--text-2)' }}>Thuế TNCN</div>
-                    <div style={{ fontSize: 10, color: 'var(--accent)' }}>Tỷ lệ: {formatDecimalPct(result.rates?.tncnRate)}</div>
+                    <div style={{ fontSize: 10, color: 'var(--accent)' }}>
+                      {result.revenueGroup === 2 ? `(DT - 500tr) × ${formatDecimalPct(result.rates?.tncnRate)}` :
+                       result.revenueGroup === 3 ? '(DT - CP) × 17%' :
+                       result.revenueGroup === 4 ? '(DT - CP) × 20%' :
+                       `Tỷ lệ: ${formatDecimalPct(result.rates?.tncnRate)}`}
+                    </div>
                     <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--accent)', marginTop: 4 }}>
                       <CountUp value={result.tncnAmount} />
                     </div>
@@ -531,15 +550,24 @@ export default function Tax() {
           {!result && stepperIndex === null && (
             <div className="flex-col gap-3 mt-4">
               <div className="card">
-                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--accent)', marginBottom: 8 }}>📌 Ngưỡng miễn thuế</div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--accent)', marginBottom: 8 }}>📌 Ngưỡng miễn thuế HKD</div>
                 <div style={{ fontSize: 13, color: 'var(--text-2)', lineHeight: 1.6 }}>
-                  Hộ kinh doanh có doanh thu dưới <strong style={{ color: 'var(--text-1)' }}>100.000.000 ₫/năm</strong> được miễn thuế VAT và TNCN theo Thông tư 40/2021/TT-BTC.
+                  Hộ kinh doanh có doanh thu <strong style={{ color: 'var(--text-1)' }}>≤ 500.000.000 ₫/năm</strong> được <strong style={{ color: 'var(--accent)' }}>MIỄN HOÀN TOÀN</strong> thuế VAT và TNCN. Chỉ cần kê khai doanh thu 1 lần trước 31/1 năm sau.
+                </div>
+              </div>
+              <div className="card">
+                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--cyan)', marginBottom: 8 }}>📊 Phân nhóm doanh thu</div>
+                <div style={{ fontSize: 12, color: 'var(--text-2)', lineHeight: 1.8 }}>
+                  <span style={{ color: 'var(--accent)', fontWeight: 600 }}>Nhóm 1</span> ≤ 500 triệu → Miễn thuế<br/>
+                  <span style={{ color: 'var(--amber)', fontWeight: 600 }}>Nhóm 2</span> 500 triệu–3 tỷ → TNCN trên phần vượt 500 triệu<br/>
+                  <span style={{ color: 'var(--cyan)', fontWeight: 600 }}>Nhóm 3</span> 3 tỷ–50 tỷ → TNCN 17% × lợi nhuận<br/>
+                  <span style={{ color: '#a78bfa', fontWeight: 600 }}>Nhóm 4</span> &gt; 50 tỷ → TNCN 20% × lợi nhuận
                 </div>
               </div>
               <div className="card">
                 <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--amber)', marginBottom: 8 }}>⚠️ Lệ phí Môn bài 2026</div>
                 <div style={{ fontSize: 13, color: 'var(--text-2)', lineHeight: 1.6 }}>
-                  Hạn nộp: <strong style={{ color: 'var(--text-1)' }}>30/01/2026</strong>. Mức: 300.000 – 1.000.000 ₫ tùy doanh thu.
+                  Hạn nộp: <strong style={{ color: 'var(--text-1)' }}>30/01/2026</strong>. Mức: 300.000 – 1.000.000 ₫ tùy doanh thu (ngưỡng phân bậc: 100 triệu / 300 triệu / 500 triệu).
                 </div>
               </div>
             </div>

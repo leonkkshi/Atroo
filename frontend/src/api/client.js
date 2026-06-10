@@ -20,15 +20,22 @@ async function request(path, options = {}) {
     headers,
   });
 
-  // 401 → clear token & redirect to login
-  if (res.status === 401) {
+  // Parse body trước để luôn lấy được message lỗi từ server
+  let data;
+  try {
+    data = await res.json();
+  } catch {
+    data = {};
+  }
+
+  // 401 chỉ redirect nếu đang có token (session hết hạn)
+  // Nếu không có token (ví dụ: đăng nhập sai) → để lỗi hiển thị bình thường
+  if (res.status === 401 && token) {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     window.location.href = '/login';
     throw new Error('Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.');
   }
-
-  const data = await res.json();
 
   if (!res.ok) {
     throw new Error(data.error || `Lỗi ${res.status}`);
@@ -101,7 +108,11 @@ export const invoiceApi = {
       method: 'POST',
       headers: token ? { Authorization: `Bearer ${token}` } : {},
       body: formData,
-    }).then(r => r.json());
+    }).then(async r => {
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || `Lỗi ${r.status}`);
+      return data;
+    });
   },
   getAll: () => request('/invoices'),
 };

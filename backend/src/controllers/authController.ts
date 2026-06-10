@@ -69,14 +69,22 @@ export const login = async (req: Request, res: Response) => {
       return res.status(401).json({ error: 'Mã số thuế hoặc mật khẩu không chính xác.' });
     }
 
+    // Kiểm tra tài khoản bị khóa
+    if (user.status === 'SUSPENDED') {
+      return res.status(403).json({ error: 'Tài khoản của bạn đã bị tạm khóa. Vui lòng liên hệ quản trị viên.' });
+    }
+
     // Kiểm tra mật khẩu
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
       return res.status(401).json({ error: 'Mã số thuế hoặc mật khẩu không chính xác.' });
     }
 
-    // Tạo JWT token (hết hạn trong 30 ngày cho app di động thoải mái)
-    const token = jwt.sign({ id: user.id, taxCode: user.taxCode }, JWT_SECRET, { expiresIn: '30d' });
+    // Tạo JWT token — bao gồm role để frontend nhận biết quyền
+    const token = jwt.sign({ id: user.id, taxCode: user.taxCode, role: user.role }, JWT_SECRET, { expiresIn: '30d' });
+
+    // Cập nhật lastActiveAt
+    prisma.user.update({ where: { id: user.id }, data: { lastActiveAt: new Date() } }).catch(() => {});
 
     res.json({
       message: 'Đăng nhập thành công.',
@@ -84,7 +92,9 @@ export const login = async (req: Request, res: Response) => {
       user: {
         id: user.id,
         taxCode: user.taxCode,
-        businessName: user.businessName
+        businessName: user.businessName,
+        role: user.role,
+        status: user.status,
       }
     });
   } catch (error: any) {
@@ -109,9 +119,12 @@ export const getProfile = async (req: any, res: Response) => {
         bankAccount: true,
         bankAccountName: true,
         createdAt: true,
+        lastActiveAt: true,
         businessType: true,
         revenueGoal: true,
-        staffSize: true
+        staffSize: true,
+        role: true,
+        status: true,
       }
     });
 
@@ -179,9 +192,12 @@ export const updateProfile = async (req: any, res: Response) => {
         bankAccount: true,
         bankAccountName: true,
         createdAt: true,
+        lastActiveAt: true,
         businessType: true,
         revenueGoal: true,
-        staffSize: true
+        staffSize: true,
+        role: true,
+        status: true,
       }
     });
 

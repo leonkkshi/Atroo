@@ -105,3 +105,14 @@ export const invoiceApi = {
   },
   getAll: () => request('/invoices'),
 };
+
+// ── Admin ──────────────────────────────────────────────────────
+export const adminApi = {
+  getStats: () => request('/admin/stats'),
+  getUsers: (params = {}) => request(`/admin/users?${new URLSearchParams(params)}`),
+  getUserDetail: (id) => request(`/admin/users/${id}`),
+  updateUserStatus: (id, status) =>
+    request(`/admin/users/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }),
+  deleteUser: (id) => request(`/admin/users/${id}`, { method: 'DELETE' }),
+};
+

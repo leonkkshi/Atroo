@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState } from 'react';
 
 const AuthContext = createContext(null);
 
@@ -23,9 +23,10 @@ export function AuthProvider({ children }) {
   };
 
   const isAuthenticated = !!token && !!user;
+  const isAdmin = user?.role === 'ADMIN';
 
   return (
-    <AuthContext.Provider value={{ user, token, isAuthenticated, login, logout }}>
+    <AuthContext.Provider value={{ user, token, isAuthenticated, isAdmin, login, logout }}>
       {children}
     </AuthContext.Provider>
   );

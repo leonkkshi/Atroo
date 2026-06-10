@@ -12,6 +12,9 @@ model User {
   taxCode          String           @unique
   businessName     String
   password         String
+  role             String           @default("USER")   // "USER" | "ADMIN"
+  status           String           @default("ACTIVE") // "ACTIVE" | "SUSPENDED"
+  lastActiveAt     DateTime?                            // Updated on every authenticated API call
   phone            String?
   address          String?
   bankName         String?

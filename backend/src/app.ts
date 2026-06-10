@@ -12,6 +12,7 @@ import invoiceRoutes from './routes/invoiceRoutes';
 import chatRoutes from './routes/chatRoutes';
 import calendarRoutes from './routes/calendarRoutes';
 import posRoutes from './routes/posRoutes';
+import adminRoutes from './routes/adminRoutes';
 import { errorHandler } from './middlewares/error';
 
 const app = express();
@@ -44,6 +45,7 @@ app.use('/api/v1/invoices', invoiceRoutes);
 app.use('/api/v1/ai', chatRoutes);
 app.use('/api/v1/calendar', calendarRoutes);
 app.use('/api/v1/pos', posRoutes);
+app.use('/api/v1/admin', adminRoutes);
 
 // Bắt lỗi toàn hệ thống
 app.use(errorHandler);

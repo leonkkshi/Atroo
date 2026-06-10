@@ -11,6 +11,7 @@ import Tax from './pages/Tax';
 import Calendar from './pages/Calendar';
 import Chat from './pages/Chat';
 import Settings from './pages/Settings';
+import AdminUsers from './pages/AdminUsers';
 
 function AuthGate() {
   const [mode, setMode] = useState('login'); // 'login' | 'register'
@@ -22,6 +23,13 @@ function AuthGate() {
 function PrivateRoute({ children }) {
   const { isAuthenticated } = useAuth();
   return isAuthenticated ? children : <Navigate to="/login" replace />;
+}
+
+function AdminRoute({ children }) {
+  const { isAuthenticated, isAdmin } = useAuth();
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  if (!isAdmin) return <Navigate to="/dashboard" replace />;
+  return children;
 }
 
 function AppRoutes() {
@@ -43,6 +51,7 @@ function AppRoutes() {
                 <Route path="calendar"  element={<Calendar />} />
                 <Route path="chat"      element={<Chat />} />
                 <Route path="settings"  element={<Settings />} />
+                <Route path="admin"     element={<AdminRoute><AdminUsers /></AdminRoute>} />
                 <Route path="*"         element={<Navigate to="/dashboard" replace />} />
               </Routes>
             </Layout>

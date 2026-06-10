@@ -72,6 +72,14 @@ function IconSettings() {
     </svg>
   );
 }
+function IconAdmin() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+      <path d="M9 12l2 2 4-4"/>
+    </svg>
+  );
+}
 
 // Extended nav with calendar
 const SIDEBAR_ITEMS = [
@@ -84,17 +92,24 @@ const SIDEBAR_ITEMS = [
   { path: '/settings',  label: 'Cài đặt',   icon: IconSettings },
 ];
 
+const ADMIN_ITEM = { path: '/admin', label: 'Quản trị', icon: IconAdmin };
+
 
 // ── Sidebar (desktop) ─────────────────────────────────────────
 export function Sidebar() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, logout } = useAuth();
+  const { user, logout, isAdmin } = useAuth();
 
   const handleLogout = () => {
     logout();
     navigate('/login');
   };
+
+  // Build nav items: insert admin item before settings if user is admin
+  const navItems = isAdmin
+    ? [...SIDEBAR_ITEMS.slice(0, -1), ADMIN_ITEM, SIDEBAR_ITEMS[SIDEBAR_ITEMS.length - 1]]
+    : SIDEBAR_ITEMS;
 
   return (
     <aside className="sidebar">
@@ -130,14 +145,22 @@ export function Sidebar() {
       </div>
 
       <nav className="sidebar-nav">
-        {SIDEBAR_ITEMS.map(item => {
+        {navItems.map(item => {
           const active = location.pathname === item.path;
+          const isAdminItem = item.path === '/admin';
           return (
             <button
               key={item.path}
               id={`sidebar-${item.path.slice(1)}`}
               className={`sidebar-item${active ? ' active' : ''}`}
               onClick={() => navigate(item.path)}
+              style={isAdminItem ? {
+                borderTop: '1px solid var(--border)',
+                marginTop: 4,
+                paddingTop: 12,
+                color: active ? 'var(--accent)' : 'var(--accent)',
+                opacity: active ? 1 : 0.7,
+              } : undefined}
             >
               <item.icon />
               {item.label}

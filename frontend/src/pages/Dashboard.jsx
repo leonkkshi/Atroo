@@ -112,8 +112,8 @@ export default function Dashboard() {
     datasets: [{
       label: 'Doanh thu',
       data: revenueData,
-      backgroundColor: 'rgba(0,229,160,0.25)',
-      borderColor: '#00E5A0',
+      backgroundColor: 'rgba(26, 143, 227, 0.28)',
+      borderColor: '#1A8FE3',
       borderWidth: 2,
       borderRadius: 8,
       borderSkipped: false,
@@ -122,20 +122,26 @@ export default function Dashboard() {
   const chartOptions = {
     responsive: true,
     maintainAspectRatio: false,
-    plugins: { legend: { display: false }, tooltip: {
-      backgroundColor: '#1C2340',
-      borderColor: '#2A3356',
-      borderWidth: 1,
-      titleColor: '#8892B0',
-      bodyColor: '#FFFFFF',
-      callbacks: {
-        label: (ctx) => ' ' + new Intl.NumberFormat('vi-VN').format(ctx.raw) + ' ₫',
-      },
-    }},
+    plugins: {
+      legend: { display: false }, tooltip: {
+        backgroundColor: 'rgba(12, 33, 55, 0.92)',
+        borderColor: 'rgba(26, 143, 227, 0.40)',
+        borderWidth: 1,
+        titleColor: '#94C4E8',
+        bodyColor: '#FFFFFF',
+        callbacks: {
+          label: (ctx) => ' ' + new Intl.NumberFormat('vi-VN').format(ctx.raw) + ' ₫',
+        },
+      }
+    },
     scales: {
-      x: { grid: { color: 'rgba(42,51,86,0.5)' }, ticks: { color: '#8892B0', font: { size: 10 } } },
-      y: { grid: { color: 'rgba(42,51,86,0.5)' }, ticks: { color: '#8892B0', font: { size: 10 },
-        callback: (v) => new Intl.NumberFormat('vi-VN', { notation: 'compact' }).format(v) + ' ₫' } },
+      x: { grid: { color: 'rgba(148, 196, 232, 0.30)' }, ticks: { color: '#5A7A96', font: { size: 10 } } },
+      y: {
+        grid: { color: 'rgba(148, 196, 232, 0.30)' }, ticks: {
+          color: '#5A7A96', font: { size: 10 },
+          callback: (v) => new Intl.NumberFormat('vi-VN', { notation: 'compact' }).format(v) + ' ₫'
+        }
+      },
     },
   };
 
@@ -180,9 +186,9 @@ export default function Dashboard() {
         const percent = Math.min(Math.round((monthRevenue / goalVal) * 100), 100);
         return (
           <div className="card mb-6 animate-fade-in" style={{
-            background: 'linear-gradient(135deg, rgba(0, 229, 160, 0.05) 0%, rgba(28, 35, 64, 0.8) 100%)',
-            border: '1px solid rgba(0, 229, 160, 0.25)',
-            boxShadow: '0 8px 32px rgba(0,0,0,0.15)',
+            background: 'linear-gradient(135deg, rgba(26, 143, 227, 0.08) 0%, rgba(255, 255, 255, 0.75) 100%)',
+            border: '1px solid rgba(26, 143, 227, 0.28)',
+            boxShadow: '0 8px 32px rgba(26, 143, 227, 0.12)',
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
               <div>
@@ -200,7 +206,7 @@ export default function Dashboard() {
                 {percent}%
               </div>
             </div>
-            
+
             <div style={{
               width: '100%', height: 10, background: 'rgba(255,255,255,0.06)', borderRadius: 5, overflow: 'hidden',
               position: 'relative', border: '1px solid var(--border)'
@@ -262,7 +268,7 @@ export default function Dashboard() {
         <div className="section-title mb-3">🧾 Giao dịch gần đây</div>
         <div className="card">
           {loading ? (
-            [1,2,3].map(i => (
+            [1, 2, 3].map(i => (
               <div key={i} className="list-item">
                 <div className="skeleton skeleton-avatar" />
                 <div style={{ flex: 1 }}>
@@ -276,7 +282,7 @@ export default function Dashboard() {
               <div style={{ fontSize: 36 }}>🛍</div>
               <div className="empty-title">Chưa có giao dịch</div>
               <div className="empty-body">
-                Bắt đầu bán hàng từ màn hình <strong>Bán hàng</strong>.<br/>
+                Bắt đầu bán hàng từ màn hình <strong>Bán hàng</strong>.<br />
                 <span style={{ fontSize: 12 }}>Món ăn · Cắt tóc · Sửa xe · Vật tư</span>
               </div>
             </div>

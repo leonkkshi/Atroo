@@ -476,14 +476,14 @@ export default function Tax() {
 
               {result.taxType === 'HKD' && !isExempt && (
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, margin: '16px 0' }}>
-                  <div className="card" style={{ borderTop: '2px solid var(--cyan)', background: 'rgba(10, 14, 26, 0.4)', padding: 12, borderRadius: 14 }}>
+                  <div className="card" style={{ borderTop: '2px solid var(--cyan)', background: 'rgba(255, 255, 255, 0.65)', padding: 12, borderRadius: 14 }}>
                     <div style={{ fontSize: 11, color: 'var(--text-2)' }}>Thuế GTGT (VAT)</div>
                     <div style={{ fontSize: 10, color: 'var(--cyan)' }}>Tỷ lệ: {formatDecimalPct(result.rates?.vatRate)}</div>
                     <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--cyan)', marginTop: 4 }}>
                       <CountUp value={result.vatAmount} />
                     </div>
                   </div>
-                  <div className="card" style={{ borderTop: '2px solid var(--accent)', background: 'rgba(10, 14, 26, 0.4)', padding: 12, borderRadius: 14 }}>
+                  <div className="card" style={{ borderTop: '2px solid var(--accent)', background: 'rgba(255, 255, 255, 0.65)', padding: 12, borderRadius: 14 }}>
                     <div style={{ fontSize: 11, color: 'var(--text-2)' }}>Thuế TNCN</div>
                     <div style={{ fontSize: 10, color: 'var(--accent)' }}>
                       {result.revenueGroup === 2 ? `(DT - 500tr) × ${formatDecimalPct(result.rates?.tncnRate)}` :

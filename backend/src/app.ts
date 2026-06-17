@@ -4,7 +4,13 @@ import dotenv from 'dotenv';
 
 
 // Load variables from .env file
-dotenv.config();
+// NODE_ENV=local → dùng .env.local (PostgreSQL Docker cục bộ)
+// NODE_ENV khác  → dùng .env mặc định (Railway cloud)
+if (process.env.NODE_ENV === 'local') {
+  dotenv.config({ path: '.env.local' });
+} else {
+  dotenv.config();
+}
 
 import authRoutes from './routes/authRoutes';
 import taxRoutes from './routes/taxRoutes';

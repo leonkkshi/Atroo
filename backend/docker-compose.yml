@@ -1,10 +1,12 @@
 version: '3.8'
 
 services:
+  # ── PostgreSQL local (dùng: npm run db:local) ─────────────────
   db:
     image: postgres:16-alpine
     container_name: atro_postgres_db
     restart: always
+    profiles: ["local"]
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
@@ -14,10 +16,12 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
 
+  # ── Backend app (dùng: docker-compose up web) ─────────────────
   web:
     build: .
     container_name: atro_backend_app
     restart: always
+    profiles: ["prod"]
     ports:
       - "3000:3000"
     environment:

@@ -239,7 +239,7 @@ export default function Settings() {
 
       {/* Brand Identity Card */}
       {user && (
-        <div className="card card--accent" style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 20, background: 'linear-gradient(135deg, var(--surface) 0%, rgba(28, 35, 64, 0.6) 100%)', borderLeft: '3px solid var(--accent)' }}>
+        <div className="card card--accent" style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 20, background: 'linear-gradient(135deg, rgba(255,255,255,0.80) 0%, rgba(200, 230, 248, 0.70) 100%)', borderLeft: '3px solid var(--accent)' }}>
           <div style={{
             width: 56, height: 56, borderRadius: '50%', background: 'var(--accent-dim)',
             border: '2px solid var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center',

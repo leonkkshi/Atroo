@@ -1,4 +1,5 @@
-import { createContext, useContext, useState } from 'react';
+import { createContext, useContext, useState, useEffect } from 'react';
+import { initSessionManager, startHeartbeat, stopHeartbeat, logoutAndClear } from '../utils/sessionManager';
 
 const AuthContext = createContext(null);
 
@@ -8,18 +9,28 @@ export function AuthProvider({ children }) {
   });
   const [token, setToken] = useState(() => localStorage.getItem('token'));
 
+  // Khởi động heartbeat nếu đã đăng nhập (ví dụ: reload trang)
+  useEffect(() => {
+    if (token) {
+      initSessionManager();
+    }
+  }, []);
+
   const login = (userData, jwt) => {
     setUser(userData);
     setToken(jwt);
     localStorage.setItem('user', JSON.stringify(userData));
     localStorage.setItem('token', jwt);
+    // Bắt đầu heartbeat
+    startHeartbeat();
   };
 
   const logout = () => {
+    stopHeartbeat();
+    // Gọi API logout (fire-and-forget)
+    logoutAndClear().catch(() => {});
     setUser(null);
     setToken(null);
-    localStorage.removeItem('user');
-    localStorage.removeItem('token');
   };
 
   const isAuthenticated = !!token && !!user;

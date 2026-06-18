@@ -83,12 +83,15 @@ export const login = async (req: Request, res: Response) => {
     // Tạo JWT token — bao gồm role để frontend nhận biết quyền
     const token = jwt.sign({ id: user.id, taxCode: user.taxCode, role: user.role }, JWT_SECRET, { expiresIn: '30d' });
 
-    // Cập nhật lastActiveAt
-    prisma.user.update({ where: { id: user.id }, data: { lastActiveAt: new Date() } }).catch(() => {});
+    // Cập nhật lastActiveAt và tạo UserSession mới
+    const now = new Date();
+    prisma.user.update({ where: { id: user.id }, data: { lastActiveAt: now } }).catch(() => {});
+    const session = await prisma.userSession.create({ data: { userId: user.id } });
 
     res.json({
       message: 'Đăng nhập thành công.',
       token,
+      sessionId: session.id,
       user: {
         id: user.id,
         taxCode: user.taxCode,
@@ -205,5 +208,72 @@ export const updateProfile = async (req: any, res: Response) => {
   } catch (error: any) {
     console.error('[Auth] updateProfile error:', error);
     res.status(500).json({ error: 'Cập nhật thất bại. Vui lòng thử lại.' });
+  }
+};
+
+// ── POST /auth/logout ────────────────────────────────────────────────────────
+export const logout = async (req: any, res: Response) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ error: 'Chưa xác thực.' });
+
+    // Tìm session đang mở (logoutAt = null) gần nhất
+    const session = await prisma.userSession.findFirst({
+      where: { userId, logoutAt: null },
+      orderBy: { loginAt: 'desc' },
+    });
+
+    if (session) {
+      const durationSec = Math.round((Date.now() - session.loginAt.getTime()) / 1000);
+      const cappedDuration = Math.min(durationSec, 8 * 3600); // tối đa 8 giờ / session
+      await prisma.userSession.update({
+        where: { id: session.id },
+        data: { logoutAt: new Date(), duration: cappedDuration },
+      });
+    }
+
+    res.json({ message: 'Đăng xuất thành công.' });
+  } catch (error: any) {
+    console.error('[Auth] logout error:', error);
+    res.status(500).json({ error: 'Đăng xuất thất bại.' });
+  }
+};
+
+// ── PATCH /auth/session/heartbeat ────────────────────────────────────────────
+// Frontend gọi mỗi 5 phút để "update" thời gian session đang mở
+export const heartbeat = async (req: any, res: Response) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ error: 'Chưa xác thực.' });
+
+    const now = new Date();
+
+    // Cập nhật lastActiveAt
+    prisma.user.update({ where: { id: userId }, data: { lastActiveAt: now } }).catch(() => {});
+
+    // Tìm session đang mở gần nhất
+    const session = await prisma.userSession.findFirst({
+      where: { userId, logoutAt: null },
+      orderBy: { loginAt: 'desc' },
+    });
+
+    if (session) {
+      // Tính duration tạm thời (để nếu tab bị đóng đột ngột, có giá trị gần đúng)
+      const durationSec = Math.round((now.getTime() - session.loginAt.getTime()) / 1000);
+      const cappedDuration = Math.min(durationSec, 8 * 3600);
+      // Không đặt logoutAt — chỉ lưu duration tạm
+      await prisma.userSession.update({
+        where: { id: session.id },
+        data: { duration: cappedDuration },
+      });
+    } else {
+      // Tạo session mới nếu không có (ví dụ: login từ session cũ trước khi có tính năng)
+      await prisma.userSession.create({ data: { userId } });
+    }
+
+    res.json({ ok: true });
+  } catch (error: any) {
+    console.error('[Auth] heartbeat error:', error);
+    res.status(500).json({ error: 'Heartbeat thất bại.' });
   }
 };

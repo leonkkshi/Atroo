@@ -121,9 +121,40 @@ export const getUserDetail = async (req: AuthenticatedRequest, res: Response) =>
       return res.status(404).json({ error: 'Không tìm thấy người dùng.' });
     }
 
+    // Thống kê session
+    const now = new Date();
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 3600 * 1000);
+    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 3600 * 1000);
+
+    const [totalSessionAgg, last30Agg, last7Agg] = await Promise.all([
+      prisma.userSession.aggregate({
+        where: { userId, duration: { not: null } },
+        _sum: { duration: true },
+        _count: { id: true },
+        _avg: { duration: true },
+      }),
+      prisma.userSession.aggregate({
+        where: { userId, loginAt: { gte: thirtyDaysAgo }, duration: { not: null } },
+        _sum: { duration: true },
+      }),
+      prisma.userSession.aggregate({
+        where: { userId, loginAt: { gte: sevenDaysAgo }, duration: { not: null } },
+        _sum: { duration: true },
+      }),
+    ]);
+
     res.json({
       ...user,
-      stats: { declarationCount, invoiceCount, posInvoiceCount },
+      stats: {
+        declarationCount,
+        invoiceCount,
+        posInvoiceCount,
+        totalDuration: totalSessionAgg._sum.duration ?? 0,
+        totalSessions: totalSessionAgg._count.id ?? 0,
+        avgDuration: Math.round(totalSessionAgg._avg.duration ?? 0),
+        last30Days: last30Agg._sum.duration ?? 0,
+        last7Days: last7Agg._sum.duration ?? 0,
+      },
     });
   } catch (error: any) {
     console.error('[Admin] getUserDetail error:', error);
@@ -203,5 +234,132 @@ export const deleteUser = async (req: AuthenticatedRequest, res: Response) => {
   } catch (error: any) {
     console.error('[Admin] deleteUser error:', error);
     res.status(500).json({ error: 'Không thể xóa người dùng.' });
+  }
+};
+
+// ── GET /admin/users/:id/usage ────────────────────────────────────────────────
+export const getUserUsage = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const userId = parseInt(String(req.params.id));
+    if (isNaN(userId)) return res.status(400).json({ error: 'ID không hợp lệ.' });
+
+    const now = new Date();
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 3600 * 1000);
+    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 3600 * 1000);
+
+    // Lấy 30 session gần nhất để vẽ chart
+    const recentSessions = await prisma.userSession.findMany({
+      where: { userId, duration: { not: null } },
+      orderBy: { loginAt: 'desc' },
+      take: 60,
+      select: { loginAt: true, logoutAt: true, duration: true },
+    });
+
+    // Tổng hợp theo ngày (7 ngày gần nhất)
+    const dailyMap: Record<string, number> = {};
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(now);
+      d.setDate(d.getDate() - i);
+      dailyMap[d.toISOString().slice(0, 10)] = 0;
+    }
+    for (const s of recentSessions) {
+      const day = s.loginAt.toISOString().slice(0, 10);
+      if (dailyMap[day] !== undefined && s.duration) {
+        dailyMap[day] += s.duration;
+      }
+    }
+
+    const [totalAgg, last30Agg, last7Agg] = await Promise.all([
+      prisma.userSession.aggregate({
+        where: { userId, duration: { not: null } },
+        _sum: { duration: true },
+        _count: { id: true },
+        _avg: { duration: true },
+      }),
+      prisma.userSession.aggregate({
+        where: { userId, loginAt: { gte: thirtyDaysAgo }, duration: { not: null } },
+        _sum: { duration: true },
+        _count: { id: true },
+      }),
+      prisma.userSession.aggregate({
+        where: { userId, loginAt: { gte: sevenDaysAgo }, duration: { not: null } },
+        _sum: { duration: true },
+        _count: { id: true },
+      }),
+    ]);
+
+    res.json({
+      totalDuration: totalAgg._sum.duration ?? 0,
+      totalSessions: totalAgg._count.id ?? 0,
+      avgDuration: Math.round(totalAgg._avg.duration ?? 0),
+      last30Days: { duration: last30Agg._sum.duration ?? 0, sessions: last30Agg._count.id ?? 0 },
+      last7Days: { duration: last7Agg._sum.duration ?? 0, sessions: last7Agg._count.id ?? 0 },
+      dailyUsage: Object.entries(dailyMap).map(([date, duration]) => ({ date, duration })),
+      recentSessions: recentSessions.slice(0, 10),
+    });
+  } catch (error: any) {
+    console.error('[Admin] getUserUsage error:', error);
+    res.status(500).json({ error: 'Không thể lấy thống kê thời gian dùng.' });
+  }
+};
+
+// ── GET /admin/usage ──────────────────────────────────────────────────────────
+export const getSystemUsage = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const now = new Date();
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 3600 * 1000);
+
+    // Top 10 users dùng nhiều nhất trong 30 ngày
+    const topUsersRaw = await prisma.userSession.groupBy({
+      by: ['userId'],
+      where: { loginAt: { gte: thirtyDaysAgo }, duration: { not: null } },
+      _sum: { duration: true },
+      _count: { id: true },
+      orderBy: { _sum: { duration: 'desc' } },
+      take: 10,
+    });
+
+    // Lấy tên user
+    const userIds = topUsersRaw.map(u => u.userId);
+    const users = await prisma.user.findMany({
+      where: { id: { in: userIds } },
+      select: { id: true, businessName: true, businessType: true },
+    });
+    const userMap = Object.fromEntries(users.map(u => [u.id, u]));
+
+    const topUsers = topUsersRaw.map(u => ({
+      userId: u.userId,
+      businessName: userMap[u.userId]?.businessName ?? 'Không xác định',
+      businessType: userMap[u.userId]?.businessType,
+      totalDuration: u._sum.duration ?? 0,
+      totalSessions: u._count.id,
+    }));
+
+    // Daily tổng hệ thống (7 ngày gần nhất)
+    const allRecentSessions = await prisma.userSession.findMany({
+      where: { loginAt: { gte: new Date(now.getTime() - 7 * 24 * 3600 * 1000) }, duration: { not: null } },
+      select: { loginAt: true, duration: true },
+    });
+
+    const systemDailyMap: Record<string, number> = {};
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(now);
+      d.setDate(d.getDate() - i);
+      systemDailyMap[d.toISOString().slice(0, 10)] = 0;
+    }
+    for (const s of allRecentSessions) {
+      const day = s.loginAt.toISOString().slice(0, 10);
+      if (systemDailyMap[day] !== undefined && s.duration) {
+        systemDailyMap[day] += s.duration;
+      }
+    }
+
+    res.json({
+      topUsers,
+      systemDailyUsage: Object.entries(systemDailyMap).map(([date, duration]) => ({ date, duration })),
+    });
+  } catch (error: any) {
+    console.error('[Admin] getSystemUsage error:', error);
+    res.status(500).json({ error: 'Không thể lấy thống kê hệ thống.' });
   }
 };

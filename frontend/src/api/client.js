@@ -53,6 +53,8 @@ export const authApi = {
   profile: () => request('/auth/profile'),
   updateProfile: (data) =>
     request('/auth/profile', { method: 'PATCH', body: JSON.stringify(data) }),
+  logout: () => request('/auth/logout', { method: 'POST' }),
+  heartbeat: () => request('/auth/session/heartbeat', { method: 'PATCH' }),
 };
 
 // ── POS ────────────────────────────────────────────────────────
@@ -122,6 +124,8 @@ export const adminApi = {
   getStats: () => request('/admin/stats'),
   getUsers: (params = {}) => request(`/admin/users?${new URLSearchParams(params)}`),
   getUserDetail: (id) => request(`/admin/users/${id}`),
+  getUserUsage: (id) => request(`/admin/users/${id}/usage`),
+  getSystemUsage: () => request('/admin/usage'),
   updateUserStatus: (id, status) =>
     request(`/admin/users/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }),
   deleteUser: (id) => request(`/admin/users/${id}`, { method: 'DELETE' }),

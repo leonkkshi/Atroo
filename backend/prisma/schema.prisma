@@ -32,6 +32,7 @@ model User {
   posInvoices      PosInvoice[]
   posExpenses      PosExpense[]
   posItems         PosItem[]
+  sessions         UserSession[]
 }
 
 model TaxDeclaration {
@@ -128,3 +129,19 @@ model PosExpense {
   date      String   // Định dạng YYYY-MM-DD
   createdAt DateTime @default(now())
 }
+
+// ─── Session Tracking ──────────────────────────────────────────────────────────
+
+// Theo dõi phiên đăng nhập của từng user
+model UserSession {
+  id        Int       @id @default(autoincrement())
+  userId    Int
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  loginAt   DateTime  @default(now())
+  logoutAt  DateTime?           // null = session đang mở
+  duration  Int?               // seconds, được tính khi logout / heartbeat timeout
+
+  @@index([userId])
+  @@index([loginAt])
+}
+

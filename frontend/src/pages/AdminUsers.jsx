@@ -374,7 +374,7 @@ function UserDetailModal({ userId, onClose, onStatusChange, onDelete }) {
                   onClick={handleStatusToggle}
                   disabled={actionLoading}
                   style={{
-                    width: '100%', height: 48, borderRadius: 14, border: 'none',
+                    width: '100%', height: 48, borderRadius: 14,
                     background: detail.status === 'ACTIVE' ? 'rgba(239,68,68,0.12)' : 'rgba(0,229,160,0.12)',
                     color: detail.status === 'ACTIVE' ? 'var(--red)' : 'var(--accent)',
                     fontFamily: 'DM Sans, sans-serif', fontWeight: 600, fontSize: 14,

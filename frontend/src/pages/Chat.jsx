@@ -10,7 +10,7 @@ const QUICK_CHIPS = [
   'Tiệm cắt tóc tính thuế thế nào?',
   'Tiệm sửa xe nộp thuế bao nhiêu?',
   'Hạn nộp thuế 2026',
-  'Doanh thu dưới 100 triệu có phải nộp thuế?',
+  'Doanh thu dưới 500 triệu có phải nộp thuế?',
   'Lệ phí môn bài là gì?',
 ];
 
@@ -101,8 +101,8 @@ function EmptyState({ onPick }) {
     },
     {
       title: 'Doanh thu nhỏ',
-      desc: 'Mốc 100 triệu/năm có phải nộp thuế không.',
-      text: 'Doanh thu dưới 100 triệu có phải nộp thuế không?'
+      desc: 'Mốc 500 triệu/năm có phải nộp thuế không.',
+      text: 'Doanh thu dưới 500 triệu có phải nộp thuế không?'
     },
     {
       title: 'Hóa đơn điện tử',

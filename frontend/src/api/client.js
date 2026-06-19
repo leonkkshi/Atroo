@@ -78,8 +78,8 @@ export const posApi = {
 
 // ── Tax ────────────────────────────────────────────────────────
 export const taxApi = {
-  calculate: (taxType, revenue, businessType, expenses = 0) =>
-    request('/tax/calculate', { method: 'POST', body: JSON.stringify({ taxType, revenue, businessType, expenses }) }),
+  calculate: (taxType, revenue, businessType, expenses = 0, partsRevenue = 0, methodGroup2 = 'DIRECT') =>
+    request('/tax/calculate', { method: 'POST', body: JSON.stringify({ taxType, revenue, businessType, expenses, partsRevenue, methodGroup2 }) }),
   saveDeclaration: (data) =>
     request('/tax/declarations', { method: 'POST', body: JSON.stringify(data) }),
   getDeclarations: () => request('/tax/declarations'),

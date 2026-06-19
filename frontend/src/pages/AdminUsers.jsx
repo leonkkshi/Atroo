@@ -277,27 +277,6 @@ function UserDetailModal({ userId, onClose, onStatusChange, onDelete }) {
               ))}
             </div>
 
-            {/* Stats Row */}
-            <div style={{
-              background: 'var(--bg)', borderRadius: 14, padding: '14px 16px',
-              display: 'flex', gap: 0, marginBottom: 20,
-            }}>
-              {[
-                { label: 'Tờ khai', value: detail.stats?.declarationCount ?? 0, icon: '📋' },
-                { label: 'Hóa đơn', value: detail.stats?.invoiceCount ?? 0, icon: '🧾' },
-                { label: 'Đơn POS', value: detail.stats?.posInvoiceCount ?? 0, icon: '🛒' },
-              ].map(({ label, value, icon }, idx) => (
-                <div key={label} style={{
-                  flex: 1, textAlign: 'center', padding: '4px 0',
-                  borderRight: idx < 2 ? '1px solid var(--border)' : 'none',
-                }}>
-                  <div style={{ fontSize: 20, marginBottom: 4 }}>{icon}</div>
-                  <div style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 20, color: 'var(--accent)' }}>{value}</div>
-                  <div style={{ fontSize: 11, color: 'var(--text-2)', marginTop: 2 }}>{label}</div>
-                </div>
-              ))}
-            </div>
-
             {/* ── Thống kê thời gian dùng ── */}
             <div style={{
               background: 'var(--bg)', borderRadius: 16, padding: '16px',

@@ -16,7 +16,9 @@ Nhiệm vụ của bạn là giải đáp các câu hỏi liên quan đến chí
 
 Hướng dẫn trả lời:
 1. Luôn sử dụng ngôn ngữ Tiếng Việt, xưng hô là "A Trợ" hoặc "Trợ lý A Trợ" và gọi người dùng là "Anh/Chị" hoặc "Quý hộ kinh doanh".
-2. Bám sát các quy định pháp luật Thuế Việt Nam hiện hành (như Luật Quản lý thuế số 38/2019/QH14, Thông tư 40/2021/TT-BTC về thuế hộ kinh doanh, v.v.).
+2. Bám sát các quy định pháp luật Thuế Việt Nam hiện hành theo **Nghị định 68/2026/NĐ-CP** và các văn bản liên quan.
+   - Lưu ý quan trọng: Hộ kinh doanh có doanh thu từ 500 triệu đồng/năm trở xuống được miễn thuế GTGT và TNCN hoàn toàn.
+   - Thuế TNCN nhóm 2 (500 triệu – 3 tỷ): chỉ tính trên phần doanh thu **vượt 1 tỷ đồng**, không phải vượt 500 triệu.
 3. Khi giải thích cách tính thuế, hãy đưa ra ví dụ bằng số liệu cụ thể nếu cần thiết.
 4. Nhắc nhở người dùng về các mốc thời gian quan trọng:
    - Thuế môn bài: Hạn nộp là ngày 30 tháng 01 hàng năm (hoặc ngày cuối cùng của tháng bắt đầu hoạt động đối với hộ mới thành lập).
@@ -174,23 +176,29 @@ Anh/Chị đang muốn hoàn thuế **GTGT hay TNCN**, và mô hình kinh doanh 
 
   // Thuế khoán
   if (query.includes('khoán') || query.includes('khoan')) {
-    return `Chào Anh/Chị. Về **Thuế khoán** của Hộ kinh doanh cá thể, **A Trợ** xin tư vấn như sau:
+    return `Chào Anh/Chị. Về **Thuế khoán** của Hộ kinh doanh cá thể, **A Trợ** xin tư vấn theo **Nghị định 68/2026/NĐ-CP**:
 
-Theo **Thông tư 40/2021/TT-BTC**, hộ kinh doanh có doanh thu từ **100 triệu đồng/năm trở xuống** được **miễn thuế GTGT và TNCN**.
+Hộ kinh doanh có doanh thu từ **500 triệu đồng/năm trở xuống** được **miễn hoàn toàn thuế GTGT và TNCN**.
 
-Nếu doanh thu trên **100 triệu đồng/năm**:
+Nếu doanh thu **trên 500 triệu đồng/năm** (Nhóm 2):
 
 | Lĩnh vực ngành nghề | Thuế suất GTGT | Thuế suất TNCN | Tổng tỷ lệ |
 | :--- | :---: | :---: | :---: |
 | Phân phối, cung cấp hàng hóa | 1% | 0.5% | **1.5%** |
-| Dịch vụ, xây dựng không bao thầu NVL | 5% | 2% | **7.0%** |
-| Sản xuất, vận tải, dịch vụ kèm hàng hóa | 3% | 1.5% | **4.5%** |
+| Dịch vụ không bao thầu NVL (Ăn uống, cắt tóc, sửa xe...) | 5% | 2% | **7.0%** |
+| Sản xuất, vận tải, xây dựng có bao thầu NVL | 3% | 1.5% | **4.5%** |
+| Cho thuê tài sản (BĐS, máy móc...) | 5% | 5% | **10.0%** |
+| Dịch vụ thông tin số, quảng cáo số | 5% | 5% | **10.0%** |
 | Hoạt động kinh doanh khác | 2% | 1% | **3.0%** |
 
-*Ví dụ ngành Dịch vụ, doanh thu quý **50.000.000 ₫**:*
-*   Thuế GTGT = 50.000.000 × 5% = **2.500.000 ₫**
-*   Thuế TNCN = 50.000.000 × 2% = **1.000.000 ₫**
-*   **Tổng phải nộp: 3.500.000 ₫**
+> **Lưu ý quan trọng (Nghị định 68/2026):** Thuế TNCN Nhóm 2 chỉ tính trên phần doanh thu **vượt 1 tỷ đồng** (không phải vượt 500 triệu).
+
+*Ví dụ ngành Dịch vụ (ăn uống, cắt tóc...), doanh thu cả năm **1.200.000.000 ₫**:*
+*   Thuế GTGT = 1.200.000.000 × 5% = **60.000.000 ₫**
+*   Thuế TNCN = (1.200.000.000 - 1.000.000.000) × 2% = **4.000.000 ₫**
+*   **Tổng phải nộp: 64.000.000 ₫**
+
+*Nếu doanh thu chỉ **700.000.000 ₫**: GTGT = 700tr × 5% = 35.000.000 ₫ · TNCN = 0 ₫ (chưa vượt 1 tỷ).*
 
 Anh/Chị có cần A Trợ tính cho mức doanh thu cụ thể của mình không ạ?`;
   }
@@ -234,12 +242,14 @@ Anh/Chị theo dõi và tick trạng thái đã nộp tại màn hình **Lịch 
 
   // GTGT / VAT
   if (query.includes('vat') || query.includes('gtgt') || query.includes('giá trị gia tăng') || query.includes('gia tri gia tang')) {
-    return `Dạ Anh/Chị, **thuế GTGT** đối với hộ kinh doanh tính theo tỷ lệ % trên doanh thu:
+    return `Dạ Anh/Chị, **thuế GTGT** đối với hộ kinh doanh tính theo tỷ lệ % trên doanh thu (Nghị định 68/2026):
 
 **Tỷ lệ thuế GTGT theo ngành:**
 *   Thương mại (bán buôn, bán lẻ hàng hóa): **1%**
-*   Dịch vụ, ăn uống, cho thuê tài sản: **5%**
-*   Sản xuất, vận tải, dịch vụ kèm hàng hóa: **3%**
+*   Dịch vụ không bao thầu NVL (Ăn uống, cắt tóc, sửa xe...): **5%**
+*   Sản xuất, vận tải, xây dựng có bao thầu NVL: **3%**
+*   Cho thuê tài sản (BĐS, máy móc...): **5%**
+*   Dịch vụ thông tin số, quảng cáo số: **5%**
 *   Hoạt động kinh doanh khác: **2%**
 
 **Công thức:** Thuế GTGT = Doanh thu × Tỷ lệ tương ứng
@@ -249,15 +259,17 @@ Anh/Chị kinh doanh ngành nghề nào để A Trợ tính chính xác mức th
 
   // TNCN / thu nhập cá nhân
   if (query.includes('tncn') || query.includes('thu nhập cá nhân') || query.includes('thu nhap ca nhan')) {
-    return `Dạ Anh/Chị, **thuế TNCN** cho hộ kinh doanh tính trực tiếp trên doanh thu:
+    return `Dạ Anh/Chị, **thuế TNCN** cho hộ kinh doanh tính trực tiếp trên doanh thu (Nghị định 68/2026):
 
 **Tỷ lệ thuế TNCN theo ngành:**
 *   Thương mại: **0.5%**
-*   Dịch vụ: **2%**
-*   Sản xuất, vận tải, dịch vụ kèm hàng hóa: **1.5%**
+*   Dịch vụ không bao thầu NVL (Ăn uống, cắt tóc, sửa xe...): **2%**
+*   Sản xuất, vận tải, xây dựng có bao thầu NVL: **1.5%**
+*   Cho thuê tài sản: **5%**
+*   Dịch vụ thông tin số, quảng cáo số: **5%**
 *   Hoạt động khác: **1%**
 
-> Chỉ phát sinh thuế TNCN khi doanh thu **vượt 100 triệu đồng/năm**.
+> **Lưu ý:** Thuế TNCN nhóm 2 (DT 500 triệu – 3 tỷ) chỉ tính trên phần doanh thu **vượt 1 tỷ đồng**.
 
 Anh/Chị có muốn A Trợ tính cụ thể cho doanh thu của mình không ạ?`;
   }

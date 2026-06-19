@@ -11,16 +11,16 @@ const TAX_TYPES = [
 ];
 
 // Gợi ý ngành nghề theo 3 loại hình mục tiêu
-// Tax-rule: Quán ăn → SX+hàng hóa (VAT 3%, TNCN 1.5%); Tiệm tóc/Sửa xe → Dịch vụ (VAT 5%, TNCN 2%)
+// Nghị định 68/2026: Ăn uống → Dịch vụ không bao thầu NVL (VAT 5%, TNCN 2%); Tiệm tóc/Sửa xe → Dịch vụ (VAT 5%, TNCN 2%)
 const BIZ_PRESETS = [
   {
     key: 'food',
     icon: '🍜',
     label: 'Quán ăn',
     desc: 'Cơm bụi, bún phở...',
-    bizType: '3', // Sản xuất, ăn uống — VAT 3%, TNCN 1.5%
+    bizType: '2', // Dịch vụ không bao thầu NVL (ăn uống) — VAT 5%, TNCN 2% (Nghị định 68/2026)
     taxType: 'HKD',
-    hint: 'VAT 3% + TNCN 1.5% · miễn thuế nếu DT ≤ 500 triệu',
+    hint: 'VAT 5% + TNCN 2% · miễn thuế nếu DT ≤ 500 triệu',
   },
   {
     key: 'hair',
@@ -43,10 +43,12 @@ const BIZ_PRESETS = [
 ];
 
 const BIZ_TYPES = [
-  { value: '1', label: 'Phân phối, cung cấp hàng hóa (Đại lý, tạp hóa...)' },
-  { value: '2', label: 'Dịch vụ thuần túy (Tiệm tóc, sửa xe, giặt ủi...)' },
-  { value: '3', label: 'Sản xuất, vận tải, ăn uống (Quán cơm, bún phở...)' },
-  { value: '4', label: 'Hoạt động kinh doanh khác' },
+  { value: '1', label: 'Phân phối, cung cấp hàng hóa (Bán buôn, bán lẻ, tạp hóa...)' },
+  { value: '2', label: 'Dịch vụ không bao thầu NVL (Ăn uống, cắt tóc, sửa xe...)' },
+  { value: '3', label: 'Sản xuất, vận tải, xây dựng có bao thầu nguyên vật liệu' },
+  { value: '5', label: 'Cho thuê tài sản (Bất động sản, máy móc, thiết bị...)' },
+  { value: '6', label: 'Dịch vụ thông tin số, quảng cáo số' },
+  { value: '4', label: 'Hoạt động kinh doanh khác (2% GTGT + 1% TNCN)' },
 ];
 
 const PERIODS = ['Tháng 01/2026','Tháng 02/2026','Tháng 03/2026','Tháng 04/2026','Tháng 05/2026','Tháng 06/2026','Quý 2/2026','Quý 3/2026','Năm 2026'];
@@ -95,6 +97,8 @@ export default function Tax() {
   const [bizType, setBizType] = useState('2');
   const [revenue, setRevenue] = useState('');
   const [expenses, setExpenses] = useState('');
+  const [partsRevenue, setPartsRevenue] = useState('');
+  const [methodGroup2, setMethodGroup2] = useState('DIRECT'); // 'DIRECT' | 'PROFIT'
   const [period, setPeriod] = useState('Tháng 05/2026');
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -126,7 +130,7 @@ export default function Tax() {
     setError('');
     setStepperIndex(null);
     setStepperData(null);
-  }, [taxType, bizType, revenue, expenses]);
+  }, [taxType, bizType, revenue, expenses, partsRevenue, methodGroup2]);
 
   // Handle sequential step increment
   useEffect(() => {
@@ -151,11 +155,19 @@ export default function Tax() {
 
   const handleCalc = async (e) => {
     e.preventDefault();
-    const rev = parseFloat(revenue.replace(/\D/g, ''));
+    const revStr = String(revenue).replace(/\D/g, '');
+    const rev = parseFloat(revStr);
     if (!rev) { setError('Vui lòng nhập doanh thu hợp lệ.'); return; }
     setLoading(true); setError(''); setResult(null); setStepperIndex(null); setStepperData(null);
     try {
-      const data = await taxApi.calculate(taxType, rev, bizType, parseFloat(expenses.replace(/\D/g, '')) || 0);
+      const data = await taxApi.calculate(
+        taxType,
+        rev,
+        bizType,
+        parseFloat(String(expenses).replace(/\D/g, '')) || 0,
+        parseFloat(String(partsRevenue).replace(/\D/g, '')) || 0,
+        methodGroup2
+      );
       
       if (taxType === 'HKD') {
         setStepperData(data);
@@ -190,12 +202,18 @@ export default function Tax() {
   };
 
   const needsBizType = taxType === 'VAT' || taxType === 'TNCN' || taxType === 'HKD';
-  const needsExpenses = taxType === 'TNDN';
+  const parsedRev = parseFloat(String(revenue).replace(/\D/g, '')) || 0;
+  const isGroup2 = parsedRev > 500000000 && parsedRev <= 3000000000;
+  const isGroup3Or4 = parsedRev > 3000000000;
+  const needsExpenses = taxType === 'TNDN' || 
+    ((taxType === 'HKD' || taxType === 'TNCN') && (isGroup3Or4 || (isGroup2 && methodGroup2 === 'PROFIT')));
   const isExempt = result && result.taxAmount === 0;
 
   const applyPreset = (preset) => {
     setTaxType(preset.taxType);
     setBizType(preset.bizType);
+    setPartsRevenue('');
+    setMethodGroup2('DIRECT');
     setResult(null);
     setSaved(false);
     setError('');
@@ -309,6 +327,39 @@ export default function Tax() {
               </div>
             )}
 
+            {needsBizType && bizType === '2' && (
+              <div className="input-group">
+                <label className="input-label">Trong đó: Doanh thu bán phụ tùng (₫)</label>
+                <input
+                  id="tax-parts-revenue"
+                  className="input"
+                  type="number"
+                  placeholder="Ví dụ: 10000000"
+                  value={partsRevenue}
+                  onChange={e => setPartsRevenue(e.target.value)}
+                  inputMode="numeric"
+                />
+                <div style={{ fontSize: 11, color: 'var(--text-2)', marginTop: 4 }}>
+                  Phần doanh thu bán phụ tùng (lốp, nhớt, linh kiện...) được hưởng thuế suất ưu đãi 1.5% (1% GTGT + 0.5% TNCN).
+                </div>
+              </div>
+            )}
+
+            {needsBizType && isGroup2 && (
+              <div className="input-group">
+                <label className="input-label">Phương pháp tính thuế TNCN (Nhóm 2)</label>
+                <select
+                  id="tax-method-group2"
+                  className="input"
+                  value={methodGroup2}
+                  onChange={e => setMethodGroup2(e.target.value)}
+                >
+                  <option value="DIRECT">Trực tiếp trên doanh thu (TNCN = (DT - 500tr) × % TNCN)</option>
+                  <option value="PROFIT">Kê khai theo lợi nhuận (TNCN = (DT - Chi phí) × 15%)</option>
+                </select>
+              </div>
+            )}
+
             {needsExpenses && (
               <div className="input-group">
                 <label className="input-label">Chi phí hợp lệ (₫)</label>
@@ -392,7 +443,11 @@ export default function Tax() {
                   <div className="step-content">
                     <div className="step-title">5. Tính GTGT</div>
                     <div className="step-desc">
-                      {stepperIndex >= 4 ? (stepperData?.isExempt ? 'GTGT phải nộp: 0 ₫' : `Doanh thu × VAT% = ${fmtMoney(stepperData?.vatAmount)}`) : 'Đang tính toán thuế GTGT...'}
+                      {stepperIndex >= 4 ? (
+                        stepperData?.isExempt ? 'GTGT phải nộp: 0 ₫' :
+                        parseFloat(partsRevenue) > 0 ? `(DT dịch vụ × VAT% + DT phụ tùng × 1%) = ${fmtMoney(stepperData?.vatAmount)}` :
+                        `Doanh thu × VAT% = ${fmtMoney(stepperData?.vatAmount)}`
+                      ) : 'Đang tính toán thuế GTGT...'}
                     </div>
                   </div>
                 </div>
@@ -403,7 +458,15 @@ export default function Tax() {
                   <div className="step-content">
                     <div className="step-title">6. Tính TNCN</div>
                     <div className="step-desc">
-                      {stepperIndex >= 5 ? (stepperData?.isExempt ? 'TNCN phải nộp: 0 ₫' : stepperData?.revenueGroup === 1 ? 'Miễn TNCN' : `(DT - 500 triệu) × TNCN% = ${fmtMoney(stepperData?.tncnAmount)}`) : 'Đang tính toán thuế TNCN...'}
+                      {stepperIndex >= 5 ? (
+                        stepperData?.isExempt ? 'TNCN phải nộp: 0 ₫' :
+                        stepperData?.revenueGroup === 1 ? 'Miễn TNCN' :
+                        stepperData?.revenueGroup === 2 && methodGroup2 === 'PROFIT' ? `(DT - Chi phí) × 15% = ${fmtMoney(stepperData?.tncnAmount)}` :
+                        stepperData?.revenueGroup === 2 ? `(DT - 1 tỷ) × TNCN% = ${fmtMoney(stepperData?.tncnAmount)}` :
+                        stepperData?.revenueGroup === 3 ? `(DT - Chi phí) × 17% = ${fmtMoney(stepperData?.tncnAmount)}` :
+                        stepperData?.revenueGroup === 4 ? `(DT - Chi phí) × 20% = ${fmtMoney(stepperData?.tncnAmount)}` :
+                        `TNCN phải nộp: ${fmtMoney(stepperData?.tncnAmount)}`
+                      ) : 'Đang tính toán thuế TNCN...'}
                     </div>
                   </div>
                 </div>
@@ -486,7 +549,10 @@ export default function Tax() {
                   <div className="card" style={{ borderTop: '2px solid var(--accent)', background: 'rgba(255, 255, 255, 0.65)', padding: 12, borderRadius: 14 }}>
                     <div style={{ fontSize: 11, color: 'var(--text-2)' }}>Thuế TNCN</div>
                     <div style={{ fontSize: 10, color: 'var(--accent)' }}>
-                      {result.revenueGroup === 2 ? `(DT - 500tr) × ${formatDecimalPct(result.rates?.tncnRate)}` :
+                      {result.revenueGroup === 2 ? (
+                        methodGroup2 === 'PROFIT' ? '(DT - CP) × 15%' :
+                        `(DT - 1 tỷ) × ${formatDecimalPct(result.rates?.tncnRate)}`
+                       ) :
                        result.revenueGroup === 3 ? '(DT - CP) × 17%' :
                        result.revenueGroup === 4 ? '(DT - CP) × 20%' :
                        `Tỷ lệ: ${formatDecimalPct(result.rates?.tncnRate)}`}
@@ -559,7 +625,7 @@ export default function Tax() {
                 <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--cyan)', marginBottom: 8 }}>📊 Phân nhóm doanh thu</div>
                 <div style={{ fontSize: 12, color: 'var(--text-2)', lineHeight: 1.8 }}>
                   <span style={{ color: 'var(--accent)', fontWeight: 600 }}>Nhóm 1</span> ≤ 500 triệu → Miễn thuế<br/>
-                  <span style={{ color: 'var(--amber)', fontWeight: 600 }}>Nhóm 2</span> 500 triệu–3 tỷ → TNCN trên phần vượt 500 triệu<br/>
+                  <span style={{ color: 'var(--amber)', fontWeight: 600 }}>Nhóm 2</span> 500 triệu–3 tỷ → TNCN trên phần vượt <strong>1 tỷ</strong><br/>
                   <span style={{ color: 'var(--cyan)', fontWeight: 600 }}>Nhóm 3</span> 3 tỷ–50 tỷ → TNCN 17% × lợi nhuận<br/>
                   <span style={{ color: '#a78bfa', fontWeight: 600 }}>Nhóm 4</span> &gt; 50 tỷ → TNCN 20% × lợi nhuận
                 </div>

@@ -28,7 +28,8 @@ const VIETQR_BANK_ID = {
   'VIB': 'VIB',
 };
 
-const TAX_RATES = { FOOD: 0.03, PRODUCT: 0.01, SERVICE: 0.05 };
+// Nghị định 68/2026: Ăn uống → Dịch vụ không bao thầu NVL (5% GTGT + 2% TNCN = 7%)
+const TAX_RATES = { FOOD: 0.07, PRODUCT: 0.015, SERVICE: 0.07 };
 const TYPE_LABELS = { FOOD: '🍜 Đồ ăn / Nước uống', PRODUCT: '📦 Vật tư / Hàng hóa', SERVICE: '⚙️ Dịch vụ' };
 const TYPE_BADGE = { FOOD: 'badge-food', PRODUCT: 'badge-product', SERVICE: 'badge-service' };
 // Fallback image dùng inline SVG — hoạt động ngay cả khi không có server filesystem
@@ -48,8 +49,13 @@ const TAB_CONFIG = {
   PRODUCT: { label: '📦 Hàng hóa', sub: 'Vật tư, linh kiện' },
 };
 
-function calcTax(items) {
-  return items.reduce((sum, it) => sum + it.price * it.quantity * (TAX_RATES[it.type] || 0.03), 0);
+function calcTax(items, user) {
+  // Miễn thuế hoàn toàn nếu mục tiêu doanh thu năm ≤ 500 triệu (Nhóm 1)
+  const isExempt = user?.revenueGoal > 0 && (user.revenueGoal * 12 <= 500_000_000);
+  if (isExempt) return 0;
+  // Ước tính thuế trên từng hóa đơn = GTGT + TNCN gộp (Nghị định 68/2026)
+  // Lưu ý: TNCN Nhóm 2 chỉ tính trên phần vượt 1 tỷ — con số này là ước tính tổng hợp
+  return items.reduce((sum, it) => sum + it.price * it.quantity * (TAX_RATES[it.type] || 0.07), 0);
 }
 
 function resolveItemImage(imageUrl) {
@@ -519,7 +525,7 @@ function CartSheet({ cart, onClose, onQty, onRemove, onCheckout, user, bankProfi
   const [doneInvoice, setDoneInvoice] = useState(null);
 
   const total = cart.reduce((s, it) => s + it.price * it.quantity, 0);
-  const tax   = Math.round(calcTax(cart));
+  const tax   = Math.round(calcTax(cart, user));
 
   const handlePay = async () => {
     if (method === 'QR_BANK') { setShowQR(true); return; }

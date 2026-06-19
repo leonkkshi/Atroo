@@ -455,7 +455,6 @@ function SystemUsagePanel() {
                       <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent)', fontFamily: 'Syne, sans-serif' }}>
                         {fmtDurationFull(u.totalDuration)}
                       </div>
-                      <div style={{ fontSize: 10, color: 'var(--text-2)' }}>{u.totalSessions} phiên</div>
                     </div>
                   </div>
                   {/* Progress bar */}

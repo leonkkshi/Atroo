@@ -6,6 +6,9 @@ import {
   createInvoice, getInvoices,
   getExpenses, createExpense, deleteExpense,
 } from '../controllers/posController';
+import {
+  getVouchers, createVoucher, updateVoucher, deleteVoucher, validateVoucher,
+} from '../controllers/voucherController';
 
 const router = Router();
 
@@ -42,4 +45,12 @@ router.get('/expenses',       getExpenses);
 router.post('/expenses',      createExpense);
 router.delete('/expenses/:id', deleteExpense);
 
+// Voucher / Mã giảm giá
+router.get('/vouchers',           getVouchers);
+router.post('/vouchers/validate', validateVoucher); // Phải trước /:id để tránh conflict
+router.post('/vouchers',          createVoucher);
+router.put('/vouchers/:id',       updateVoucher);
+router.delete('/vouchers/:id',    deleteVoucher);
+
 export default router;
+

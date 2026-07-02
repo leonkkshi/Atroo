@@ -32,6 +32,7 @@ model User {
   posInvoices      PosInvoice[]
   posExpenses      PosExpense[]
   posItems         PosItem[]
+  vouchers         Voucher[]
   sessions         UserSession[]
 }
 
@@ -115,6 +116,8 @@ model PosInvoice {
   paymentMethod  String   @default("CASH") // "CASH" | "QR_BANK" | "CARD"
   status         String   @default("PAID") // "PENDING" | "PAID" | "CANCELLED"
   payosOrderCode Int?     @unique
+  voucherCode    String?                   // Mã voucher đã áp dụng (nếu có)
+  discountAmount Float    @default(0)       // Số tiền giảm giá
   createdAt      DateTime @default(now())
 }
 
@@ -128,6 +131,27 @@ model PosExpense {
   category  String   // "OPERATING" | "MATERIAL" | "SALARY" | "OTHER"
   date      String   // Định dạng YYYY-MM-DD
   createdAt DateTime @default(now())
+}
+
+// ─── Voucher / Mã giảm giá ───────────────────────────────────────────────────
+
+model Voucher {
+  id             String    @id
+  userId         Int
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  code           String                         // Mã voucher (GIAM10, SALE50K...)
+  type           String                         // "PERCENT" | "FIXED"
+  value          Float                          // % (10 = giảm 10%) hoặc VNĐ (50000)
+  minOrderAmount Float     @default(0)          // Giá trị đơn tối thiểu để áp dụng
+  usageLimit     Int?                           // null = không giới hạn số lần dùng
+  usageCount     Int       @default(0)          // Số lần đã sử dụng
+  status         String    @default("ACTIVE")   // "ACTIVE" | "INACTIVE"
+  expiresAt      DateTime?                      // null = không hết hạn
+  description    String    @default("")
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@unique([userId, code])                      // Mỗi user có mã duy nhất
 }
 
 // ─── Session Tracking ──────────────────────────────────────────────────────────

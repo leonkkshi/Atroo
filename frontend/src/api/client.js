@@ -76,6 +76,16 @@ export const posApi = {
   deleteExpense: (id) => request(`/pos/expenses/${id}`, { method: 'DELETE' }),
 };
 
+// ── Voucher ────────────────────────────────────────────────────
+export const voucherApi = {
+  getAll:   ()            => request('/pos/vouchers'),
+  create:   (data)        => request('/pos/vouchers', { method: 'POST', body: JSON.stringify(data) }),
+  update:   (id, data)    => request(`/pos/vouchers/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  remove:   (id)          => request(`/pos/vouchers/${id}`, { method: 'DELETE' }),
+  validate: (code, orderTotal) =>
+    request('/pos/vouchers/validate', { method: 'POST', body: JSON.stringify({ code, orderTotal }) }),
+};
+
 // ── Tax ────────────────────────────────────────────────────────
 export const taxApi = {
   calculate: (taxType, revenue, businessType, expenses = 0, partsRevenue = 0, methodGroup2 = 'DIRECT') =>

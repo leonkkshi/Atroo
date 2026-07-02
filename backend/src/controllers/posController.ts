@@ -284,6 +284,8 @@ export const createInvoice = async (req: AuthenticatedRequest, res: Response) =>
       items,
       paymentMethod,
       createdAt,
+      voucherCode,
+      discountAmount,
     } = req.body as {
       id?: string;
       total: number;
@@ -291,6 +293,8 @@ export const createInvoice = async (req: AuthenticatedRequest, res: Response) =>
       items: Array<{ id: string; name: string; price: number; type: string; quantity: number }>;
       paymentMethod?: string;
       createdAt?: string;
+      voucherCode?: string;
+      discountAmount?: number;
     };
 
     if (!total || !items || !Array.isArray(items) || items.length === 0) {
@@ -307,8 +311,19 @@ export const createInvoice = async (req: AuthenticatedRequest, res: Response) =>
         itemsJson: JSON.stringify(items),
         paymentMethod: paymentMethod ?? 'CASH',
         createdAt: createdAt ? new Date(createdAt) : new Date(),
+        voucherCode: voucherCode ?? null,
+        discountAmount: Number(discountAmount ?? 0),
       },
     });
+
+    // Tăng usageCount của voucher nếu có áp dụng
+    if (voucherCode) {
+      const normalizedCode = voucherCode.trim().toUpperCase();
+      await prisma.voucher.updateMany({
+        where: { userId, code: normalizedCode },
+        data: { usageCount: { increment: 1 } },
+      });
+    }
 
     res.status(201).json({ invoice });
   } catch (err) {
@@ -334,6 +349,8 @@ export const getInvoices = async (req: AuthenticatedRequest, res: Response) => {
         estimatedTax: true,
         itemsJson: true,
         paymentMethod: true,
+        voucherCode: true,
+        discountAmount: true,
         createdAt: true,
       },
     });
@@ -345,12 +362,16 @@ export const getInvoices = async (req: AuthenticatedRequest, res: Response) => {
       estimatedTax: number;
       itemsJson: string;
       paymentMethod: string;
+      voucherCode: string | null;
+      discountAmount: number;
       createdAt: Date;
     }) => ({
       id: inv.id,
       total: inv.total,
       estimatedTax: inv.estimatedTax,
       paymentMethod: inv.paymentMethod,
+      voucherCode: inv.voucherCode,
+      discountAmount: inv.discountAmount,
       createdAt: inv.createdAt,
       items: JSON.parse(inv.itemsJson) as Array<{
         id: string; name: string; price: number; type: string; quantity: number;

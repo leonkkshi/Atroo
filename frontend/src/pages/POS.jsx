@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { posApi, authApi } from '../api/client';
+import { posApi, authApi, voucherApi } from '../api/client';
 import { fmtMoney, generateId } from '../utils/format';
 import { useAuth } from '../store/authStore';
 
@@ -277,6 +277,327 @@ function DeleteConfirmModal({ item, onClose, onDeleted }) {
   );
 }
 
+// ── Voucher Form Modal ────────────────────────────────────────
+function VoucherFormModal({ onClose, onSaved, editVoucher = null }) {
+  const isEdit = !!editVoucher;
+  const [form, setForm] = useState({
+    code:           editVoucher?.code           || '',
+    type:           editVoucher?.type           || 'PERCENT',
+    value:          editVoucher?.value          != null ? String(editVoucher.value) : '',
+    minOrderAmount: editVoucher?.minOrderAmount != null ? String(editVoucher.minOrderAmount) : '0',
+    usageLimit:     editVoucher?.usageLimit     != null ? String(editVoucher.usageLimit) : '',
+    expiresAt:      editVoucher?.expiresAt      ? new Date(editVoucher.expiresAt).toISOString().slice(0, 10) : '',
+    description:    editVoucher?.description    || '',
+  });
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState('');
+  const set = (k) => (e) => setForm(f => ({ ...f, [k]: e.target.value }));
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setErr('');
+    const payload = {
+      code:           form.code.trim(),
+      type:           form.type,
+      value:          Number(form.value),
+      minOrderAmount: Number(form.minOrderAmount || 0),
+      usageLimit:     form.usageLimit ? Number(form.usageLimit) : null,
+      expiresAt:      form.expiresAt  || null,
+      description:    form.description.trim(),
+    };
+    if (!payload.code) { setErr('Vui lòng nhập mã voucher.'); return; }
+    if (!Number.isFinite(payload.value) || payload.value <= 0) { setErr('Giá trị giảm giá phải lớn hơn 0.'); return; }
+    if (payload.type === 'PERCENT' && payload.value > 100) { setErr('Phần trăm không được vượt quá 100.'); return; }
+
+    setLoading(true);
+    try {
+      const result = isEdit
+        ? await voucherApi.update(editVoucher.id, payload)
+        : await voucherApi.create(payload);
+      onSaved(result.voucher, isEdit ? 'edit' : 'add');
+      onClose();
+    } catch (e) { setErr(e.message); }
+    finally { setLoading(false); }
+  };
+
+  return (
+    <>
+      <div className="backdrop" onClick={onClose} />
+      <div className="bottom-sheet">
+        <div className="bottom-sheet-handle" />
+        <div style={{ padding: '20px 20px 40px' }}>
+          <div className="h2 mb-4">{isEdit ? '✏️ Chỉnh sửa voucher' : '🎟 Tạo voucher mới'}</div>
+          <form className="form-section" onSubmit={handleSubmit}>
+            {err && <div className="error-msg">⚠️ {err}</div>}
+
+            <div className="form-row">
+              <div className="input-group">
+                <label className="input-label">Mã voucher</label>
+                <input
+                  className="input"
+                  placeholder="VD: GIAM10, SALE50K"
+                  value={form.code}
+                  onChange={set('code')}
+                  style={{ textTransform: 'uppercase', letterSpacing: 1 }}
+                />
+                <div className="pos-add-hint">Tự động viết hoa, không dấu cách</div>
+              </div>
+              <div className="input-group">
+                <label className="input-label">Loại giảm giá</label>
+                <select className="input" value={form.type} onChange={set('type')}>
+                  <option value="PERCENT">% Phần trăm</option>
+                  <option value="FIXED">₫ Số tiền cố định</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="form-row">
+              <div className="input-group">
+                <label className="input-label">
+                  Giá trị giảm {form.type === 'PERCENT' ? '(%)' : '(₫)'}
+                </label>
+                <input
+                  className="input"
+                  type="number"
+                  placeholder={form.type === 'PERCENT' ? 'VD: 10' : 'VD: 50000'}
+                  value={form.value}
+                  onChange={set('value')}
+                  inputMode="numeric"
+                  min="0"
+                  max={form.type === 'PERCENT' ? 100 : undefined}
+                />
+              </div>
+              <div className="input-group">
+                <label className="input-label">Đơn tối thiểu (₫)</label>
+                <input
+                  className="input"
+                  type="number"
+                  placeholder="0 = không giới hạn"
+                  value={form.minOrderAmount}
+                  onChange={set('minOrderAmount')}
+                  inputMode="numeric"
+                  min="0"
+                />
+              </div>
+            </div>
+
+            <div className="form-row">
+              <div className="input-group">
+                <label className="input-label">Giới hạn lượt dùng</label>
+                <input
+                  className="input"
+                  type="number"
+                  placeholder="Để trống = không giới hạn"
+                  value={form.usageLimit}
+                  onChange={set('usageLimit')}
+                  inputMode="numeric"
+                  min="1"
+                />
+              </div>
+              <div className="input-group">
+                <label className="input-label">Ngày hết hạn</label>
+                <input
+                  className="input"
+                  type="date"
+                  value={form.expiresAt}
+                  onChange={set('expiresAt')}
+                  min={new Date().toISOString().slice(0, 10)}
+                />
+              </div>
+            </div>
+
+            <div className="input-group">
+              <label className="input-label">Mô tả (tuỳ chọn)</label>
+              <input
+                className="input"
+                placeholder="VD: Giảm 10% cho khách hàng thân thiết"
+                value={form.description}
+                onChange={set('description')}
+              />
+            </div>
+
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button className="btn btn-ghost w-full" type="button" onClick={onClose} disabled={loading}>Huỷ</button>
+              <button className="btn btn-primary w-full" type="submit" disabled={loading}>
+                {loading ? 'Đang lưu...' : (isEdit ? '💾 Lưu thay đổi' : '+ Tạo voucher')}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ── Voucher Manager View ──────────────────────────────────────
+function VoucherManagerView() {
+  const [vouchers, setVouchers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [editingVoucher, setEditingVoucher] = useState(null);
+  const [togglingId, setTogglingId] = useState(null);
+  const [deletingId, setDeletingId] = useState(null);
+
+  const loadVouchers = useCallback(() => {
+    setLoading(true);
+    voucherApi.getAll()
+      .then(d => setVouchers(d.vouchers || []))
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => { loadVouchers(); }, [loadVouchers]);
+
+  const handleSaved = (voucher, mode) => {
+    if (mode === 'edit') {
+      setVouchers(prev => prev.map(v => v.id === voucher.id ? voucher : v));
+    } else {
+      setVouchers(prev => [voucher, ...prev]);
+    }
+    setEditingVoucher(null);
+    setShowForm(false);
+  };
+
+  const handleToggle = async (v) => {
+    setTogglingId(v.id);
+    try {
+      const result = await voucherApi.update(v.id, { status: v.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE' });
+      setVouchers(prev => prev.map(x => x.id === v.id ? result.voucher : x));
+    } catch (e) { alert('Lỗi: ' + e.message); }
+    finally { setTogglingId(null); }
+  };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm('Xác nhận xóa voucher này?')) return;
+    setDeletingId(id);
+    try {
+      await voucherApi.remove(id);
+      setVouchers(prev => prev.filter(v => v.id !== id));
+    } catch (e) { alert('Lỗi: ' + e.message); }
+    finally { setDeletingId(null); }
+  };
+
+  const fmtVoucherValue = (v) =>
+    v.type === 'PERCENT' ? `Giảm ${v.value}%` : `Giảm ${fmtMoney(v.value)}`;
+
+  const fmtExpiry = (v) => {
+    if (!v.expiresAt) return '∞ Không hết hạn';
+    const d = new Date(v.expiresAt);
+    const isExpired = d < new Date();
+    return (isExpired ? '⏰ Hết hạn ' : 'HSD: ') + d.toLocaleDateString('vi-VN');
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 4 }}>
+        <button
+          id="create-voucher-btn"
+          className="btn btn-primary btn-sm"
+          onClick={() => { setEditingVoucher(null); setShowForm(true); }}
+        >
+          + Tạo voucher mới
+        </button>
+      </div>
+
+      {loading ? (
+        [1,2,3].map(i => <div key={i} className="skeleton" style={{ height: 90, borderRadius: 16 }} />)
+      ) : vouchers.length === 0 ? (
+        <div className="empty-state">
+          <div className="empty-icon">🎟</div>
+          <div className="empty-title">Chưa có voucher nào</div>
+          <div className="empty-body">Tạo mã giảm giá để thu hút khách hàng và tăng doanh thu.</div>
+          <button className="btn btn-primary btn-sm mt-3" onClick={() => setShowForm(true)}>+ Tạo ngay</button>
+        </div>
+      ) : (
+        vouchers.map(v => {
+          const isExpired = v.expiresAt && new Date(v.expiresAt) < new Date();
+          const isFull    = v.usageLimit != null && v.usageCount >= v.usageLimit;
+          const inactive  = v.status === 'INACTIVE' || isExpired || isFull;
+
+          return (
+            <div
+              key={v.id}
+              className="card"
+              style={{
+                padding: '14px 18px',
+                opacity: inactive ? 0.6 : 1,
+                borderLeft: `4px solid ${inactive ? 'var(--border)' : 'var(--accent)'}`,
+                transition: 'opacity 0.2s',
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 4 }}>
+                    <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 15, color: 'var(--text-1)', letterSpacing: 1 }}>
+                      {v.code}
+                    </span>
+                    <span
+                      className={`badge ${v.type === 'PERCENT' ? 'badge-service' : 'badge-food'}`}
+                      style={{ fontSize: 10, padding: '1px 7px' }}
+                    >
+                      {fmtVoucherValue(v)}
+                    </span>
+                    {inactive && (
+                      <span className="badge badge-product" style={{ fontSize: 10, padding: '1px 7px' }}>
+                        {isExpired ? '⏰ Hết hạn' : isFull ? '🔒 Hết lượt' : '⚫ Đã tắt'}
+                      </span>
+                    )}
+                  </div>
+                  {v.description && (
+                    <div style={{ fontSize: 12, color: 'var(--text-2)', marginBottom: 4 }}>{v.description}</div>
+                  )}
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '2px 14px', fontSize: 11, color: 'var(--text-2)' }}>
+                    {v.minOrderAmount > 0 && <span>Min: {fmtMoney(v.minOrderAmount)}</span>}
+                    <span>{fmtExpiry(v)}</span>
+                    {v.usageLimit != null
+                      ? <span>Còn {Math.max(0, v.usageLimit - v.usageCount)}/{v.usageLimit} lượt</span>
+                      : <span>Đã dùng: {v.usageCount} lần</span>
+                    }
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 5, flexShrink: 0 }}>
+                  <button
+                    className={`btn btn-sm ${v.status === 'ACTIVE' ? 'btn-ghost' : 'btn-primary'}`}
+                    style={{ height: 30, padding: '0 10px', fontSize: 11 }}
+                    onClick={() => handleToggle(v)}
+                    disabled={togglingId === v.id || isExpired || isFull}
+                  >
+                    {togglingId === v.id ? '...' : v.status === 'ACTIVE' ? '🟢 Bật' : '⚫ Tắt'}
+                  </button>
+                  <button
+                    className="btn btn-ghost btn-sm"
+                    style={{ height: 30, padding: '0 10px', fontSize: 11 }}
+                    onClick={() => { setEditingVoucher(v); setShowForm(true); }}
+                  >
+                    ✏️ Sửa
+                  </button>
+                  <button
+                    className="btn btn-sm"
+                    style={{ height: 30, padding: '0 10px', fontSize: 11, background: 'var(--danger)', color: '#fff' }}
+                    onClick={() => handleDelete(v.id)}
+                    disabled={deletingId === v.id}
+                  >
+                    {deletingId === v.id ? '...' : '🗑️'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })
+      )}
+
+      {(showForm || editingVoucher) && (
+        <VoucherFormModal
+          editVoucher={editingVoucher || null}
+          onClose={() => { setShowForm(false); setEditingVoucher(null); }}
+          onSaved={handleSaved}
+        />
+      )}
+    </div>
+  );
+}
+
 // ── QR Payment modal ──────────────────────────────────────────
 function QRModal({ amount, onClose, onConfirm, bankProfile }) {
   const bankId   = VIETQR_BANK_ID[bankProfile?.bankName] || 'MB';
@@ -401,6 +722,18 @@ function Receipt({ invoice, user, id = 'receipt-content' }) {
       
       {/* Tổng cộng & Thuế */}
       <div className="receipt-row receipt-bold" style={{ fontSize: 13 }}>
+        <span>TẠM TÍNH</span>
+        <span>{fmtMoney((invoice.total || 0) + (invoice.discountAmount || 0))}</span>
+      </div>
+
+      {invoice.discountAmount > 0 && (
+        <div className="receipt-row" style={{ fontSize: 11 }}>
+          <span>Giảm giá ({invoice.voucherCode})</span>
+          <span>- {fmtMoney(invoice.discountAmount)}</span>
+        </div>
+      )}
+
+      <div className="receipt-row receipt-bold" style={{ fontSize: 13 }}>
         <span>TỔNG CỘNG</span>
         <span>{fmtMoney(invoice.total)}</span>
       </div>
@@ -524,8 +857,37 @@ function CartSheet({ cart, onClose, onQty, onRemove, onCheckout, user, bankProfi
   const [showQR, setShowQR] = useState(false);
   const [doneInvoice, setDoneInvoice] = useState(null);
 
-  const total = cart.reduce((s, it) => s + it.price * it.quantity, 0);
-  const tax   = Math.round(calcTax(cart, user));
+  // Voucher state
+  const [voucherInput, setVoucherInput] = useState('');
+  const [voucherApplied, setVoucherApplied] = useState(null); // { code, discountAmount, description }
+  const [voucherErr, setVoucherErr] = useState('');
+  const [voucherLoading, setVoucherLoading] = useState(false);
+
+  const subtotal = cart.reduce((s, it) => s + it.price * it.quantity, 0);
+  const tax      = Math.round(calcTax(cart, user));
+  const discount = voucherApplied?.discountAmount || 0;
+  const total    = subtotal - discount;
+
+  const handleApplyVoucher = async () => {
+    if (!voucherInput.trim()) return;
+    setVoucherErr('');
+    setVoucherLoading(true);
+    try {
+      const res = await voucherApi.validate(voucherInput.trim(), subtotal);
+      setVoucherApplied({ code: res.voucher.code, discountAmount: res.discountAmount, description: res.voucher.description });
+      setVoucherInput('');
+    } catch (e) {
+      setVoucherErr(e.message);
+      setVoucherApplied(null);
+    } finally {
+      setVoucherLoading(false);
+    }
+  };
+
+  const handleRemoveVoucher = () => {
+    setVoucherApplied(null);
+    setVoucherErr('');
+  };
 
   const handlePay = async () => {
     if (method === 'QR_BANK') { setShowQR(true); return; }
@@ -541,6 +903,8 @@ function CartSheet({ cart, onClose, onQty, onRemove, onCheckout, user, bankProfi
         estimatedTax: tax,
         items: cart,
         paymentMethod: pm,
+        voucherCode: voucherApplied?.code || null,
+        discountAmount: discount,
       };
       const res = await posApi.createInvoice(invoiceData);
       const inv = { ...invoiceData, createdAt: new Date(), id: res.invoice?.id || invoiceData.id };
@@ -562,7 +926,14 @@ function CartSheet({ cart, onClose, onQty, onRemove, onCheckout, user, bankProfi
           <div style={{ padding: '24px 20px 40px', textAlign: 'center' }}>
             <div style={{ fontSize: 56, marginBottom: 12 }}>✅</div>
             <div className="h2 mb-2">Thanh toán thành công!</div>
-            <div className="body mb-4">{fmtMoney(doneInvoice.total)}</div>
+            <div className="body mb-1" style={{ color: 'var(--accent)', fontFamily: 'Syne', fontWeight: 700, fontSize: 20 }}>
+              {fmtMoney(doneInvoice.total)}
+            </div>
+            {doneInvoice.discountAmount > 0 && (
+              <div className="body mb-3" style={{ fontSize: 13, color: 'var(--success, #22c55e)' }}>
+                🎟 Đã tiết kiệm {fmtMoney(doneInvoice.discountAmount)} với mã <strong>{doneInvoice.voucherCode}</strong>
+              </div>
+            )}
             <div style={{ display: 'flex', gap: 12 }}>
               <button className="btn btn-ghost w-full" onClick={onClose}>Đóng</button>
               <button
@@ -571,9 +942,7 @@ function CartSheet({ cart, onClose, onQty, onRemove, onCheckout, user, bankProfi
                 onClick={() => {
                   const el = document.getElementById('receipt-content');
                   if (!el) return;
-                  // Hiện receipt, in, rồi ẩn lại
                   el.style.setProperty('display', 'block', 'important');
-                  // Ẩn toàn bộ nội dung khác khi in
                   document.body.setAttribute('data-printing', '1');
                   window.print();
                   el.style.display = 'none';
@@ -632,11 +1001,71 @@ function CartSheet({ cart, onClose, onQty, onRemove, onCheckout, user, bankProfi
 
           <div className="divider" />
 
+          {/* Voucher input */}
+          {voucherApplied ? (
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.25)',
+              borderRadius: 12, padding: '10px 14px', marginBottom: 12,
+            }}>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#22c55e' }}>
+                  🎟 {voucherApplied.code} — Giảm {fmtMoney(voucherApplied.discountAmount)}
+                </div>
+                {voucherApplied.description && (
+                  <div style={{ fontSize: 11, color: 'var(--text-2)', marginTop: 2 }}>{voucherApplied.description}</div>
+                )}
+              </div>
+              <button
+                className="btn btn-ghost btn-sm"
+                style={{ height: 28, padding: '0 8px', fontSize: 12 }}
+                onClick={handleRemoveVoucher}
+              >
+                ✕
+              </button>
+            </div>
+          ) : (
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ fontSize: 12, color: 'var(--text-2)', marginBottom: 6, fontWeight: 600 }}>
+                🎟 Mã giảm giá
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input
+                  id="voucher-input"
+                  className="input"
+                  placeholder="Nhập mã voucher..."
+                  value={voucherInput}
+                  onChange={e => { setVoucherInput(e.target.value.toUpperCase()); setVoucherErr(''); }}
+                  style={{ flex: 1, height: 40, fontSize: 13, letterSpacing: 1 }}
+                  onKeyDown={e => e.key === 'Enter' && handleApplyVoucher()}
+                />
+                <button
+                  id="apply-voucher-btn"
+                  className="btn btn-primary"
+                  style={{ height: 40, padding: '0 16px', fontSize: 13, flexShrink: 0 }}
+                  onClick={handleApplyVoucher}
+                  disabled={voucherLoading || !voucherInput.trim()}
+                >
+                  {voucherLoading ? '...' : 'Áp dụng'}
+                </button>
+              </div>
+              {voucherErr && (
+                <div style={{ fontSize: 12, color: 'var(--danger)', marginTop: 5 }}>⚠️ {voucherErr}</div>
+              )}
+            </div>
+          )}
+
           {/* Totals */}
           <div className="tax-detail-row">
             <span className="tax-detail-label">Tạm tính</span>
-            <span className="tax-detail-val">{fmtMoney(total)}</span>
+            <span className="tax-detail-val">{fmtMoney(subtotal)}</span>
           </div>
+          {discount > 0 && (
+            <div className="tax-detail-row">
+              <span className="tax-detail-label" style={{ color: '#22c55e' }}>🎟 Giảm giá</span>
+              <span className="tax-detail-val" style={{ color: '#22c55e' }}>− {fmtMoney(discount)}</span>
+            </div>
+          )}
           <div className="tax-detail-row">
             <span className="tax-detail-label">Thuế ước tính</span>
             <span className="tax-detail-val" style={{ color: 'var(--amber)' }}>{fmtMoney(tax)}</span>
@@ -798,14 +1227,23 @@ export default function POS() {
       {/* Header */}
       <div className="page-header">
         <div>
-          <div className="page-title">{view === 'sales' ? 'Bán hàng' : 'Lịch sử hóa đơn'}</div>
+          <div className="page-title">
+            {view === 'sales' ? 'Bán hàng' : view === 'history' ? 'Lịch sử hóa đơn' : '🎟 Quản lý Voucher'}
+          </div>
           <div className="page-sub">
-            {view === 'sales' ? 'Chọn sản phẩm để thêm vào giỏ' : 'Xem danh sách và in lại hóa đơn đã bán'}
+            {view === 'sales'
+              ? 'Chọn sản phẩm để thêm vào giỏ'
+              : view === 'history'
+              ? 'Xem danh sách và in lại hóa đơn đã bán'
+              : 'Tạo và quản lý mã giảm giá cho cửa hàng'}
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           {view === 'sales' ? (
             <>
+              <button id="view-vouchers-btn" className="btn btn-ghost btn-sm" onClick={() => setView('vouchers')}>
+                🎟 Voucher
+              </button>
               <button id="view-history-btn" className="btn btn-ghost btn-sm" onClick={() => { setView('history'); loadHistory(); }}>
                 📄 Lịch sử
               </button>
@@ -929,6 +1367,8 @@ export default function POS() {
             </button>
           )}
         </>
+      ) : view === 'vouchers' ? (
+        <VoucherManagerView />
       ) : (
         /* History view */
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>

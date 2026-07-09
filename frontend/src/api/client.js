@@ -71,6 +71,10 @@ export const posApi = {
   deleteItem: (id) => request(`/pos/items/${id}`, { method: 'DELETE' }),
   createInvoice: (invoice) => request('/pos/invoices', { method: 'POST', body: JSON.stringify(invoice) }),
   getInvoices: (limit = 50) => request(`/pos/invoices?limit=${limit}`),
+  getReport: (type, value, year) => {
+    const params = new URLSearchParams({ type, value: String(value), year: String(year) });
+    return request(`/pos/report?${params}`);
+  },
   getExpenses: () => request('/pos/expenses'),
   createExpense: (expense) => request('/pos/expenses', { method: 'POST', body: JSON.stringify(expense) }),
   deleteExpense: (id) => request(`/pos/expenses/${id}`, { method: 'DELETE' }),

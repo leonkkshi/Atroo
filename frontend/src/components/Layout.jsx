@@ -1,8 +1,8 @@
+import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../store/authStore';
 import logoMonogram from '../assets/logo-monogram.png';
 import logoWordmark from '../assets/logo-wordmark.png';
-
 
 
 // ── SVG Icons ─────────────────────────────────────────────────
@@ -80,6 +80,23 @@ function IconAdmin() {
     </svg>
   );
 }
+function IconMenu() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+      <line x1="3" y1="6" x2="21" y2="6" />
+      <line x1="3" y1="12" x2="21" y2="12" />
+      <line x1="3" y1="18" x2="21" y2="18" />
+    </svg>
+  );
+}
+function IconClose() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+      <line x1="18" y1="6" x2="6" y2="18" />
+      <line x1="6" y1="6" x2="18" y2="18" />
+    </svg>
+  );
+}
 
 // Extended nav with calendar
 const SIDEBAR_ITEMS = [
@@ -94,9 +111,18 @@ const SIDEBAR_ITEMS = [
 
 const ADMIN_ITEM = { path: '/admin', label: 'Quản trị', icon: IconAdmin };
 
+// Bottom nav shows only the 5 most important items on mobile
+const BOTTOM_NAV_ITEMS = [
+  { path: '/dashboard', label: 'Tổng quan', icon: IconDashboard },
+  { path: '/pos', label: 'Bán hàng', icon: IconPOS },
+  { path: '/finance', label: 'Tài chính', icon: IconFinance },
+  { path: '/tax', label: 'Thuế', icon: IconTax },
+  { path: '/chat', label: 'AI', icon: IconChat },
+];
 
-// ── Sidebar (desktop) ─────────────────────────────────────────
-export function Sidebar() {
+
+// ── Sidebar (desktop + tablet) ─────────────────────────────────
+export function Sidebar({ collapsed = false, onClose }) {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout, isAdmin } = useAuth();
@@ -106,15 +132,20 @@ export function Sidebar() {
     navigate('/login');
   };
 
+  const handleNav = (path) => {
+    navigate(path);
+    if (onClose) onClose(); // close drawer on mobile
+  };
+
   // Build nav items: insert admin item before settings if user is admin
   const navItems = isAdmin
     ? [...SIDEBAR_ITEMS.slice(0, -1), ADMIN_ITEM, SIDEBAR_ITEMS[SIDEBAR_ITEMS.length - 1]]
     : SIDEBAR_ITEMS;
 
   return (
-    <aside className="sidebar">
+    <aside className={`sidebar${collapsed ? ' sidebar--collapsed' : ''}`}>
       <div className="sidebar-logo">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: collapsed ? 0 : '10px', justifyContent: collapsed ? 'center' : 'flex-start' }}>
           <img
             src={logoMonogram}
             alt="ATRO Monogram"
@@ -127,20 +158,22 @@ export function Sidebar() {
               flexShrink: 0
             }}
           />
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
-            <img
-              src={logoWordmark}
-              alt="ATRO Wordmark"
-              style={{
-                height: '16px',
-                objectFit: 'contain',
-                filter: 'invert(1) brightness(1.2) contrast(1.2)',
-                mixBlendMode: 'screen',
-                alignSelf: 'flex-start'
-              }}
-            />
-            <div className="logo-sub" style={{ margin: 0, lineHeight: 1 }}>Trợ lý Thuế AI</div>
-          </div>
+          {!collapsed && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
+              <img
+                src={logoWordmark}
+                alt="ATRO Wordmark"
+                style={{
+                  height: '16px',
+                  objectFit: 'contain',
+                  filter: 'invert(1) brightness(1.2) contrast(1.2)',
+                  mixBlendMode: 'screen',
+                  alignSelf: 'flex-start'
+                }}
+              />
+              <div className="logo-sub" style={{ margin: 0, lineHeight: 1 }}>Trợ lý Thuế AI</div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -152,8 +185,9 @@ export function Sidebar() {
             <button
               key={item.path}
               id={`sidebar-${item.path.slice(1)}`}
-              className={`sidebar-item${active ? ' active' : ''}`}
-              onClick={() => navigate(item.path)}
+              className={`sidebar-item${active ? ' active' : ''}${collapsed ? ' sidebar-item--icon-only' : ''}`}
+              onClick={() => handleNav(item.path)}
+              title={collapsed ? item.label : undefined}
               style={isAdminItem ? {
                 borderTop: '1px solid var(--border)',
                 marginTop: 4,
@@ -163,35 +197,158 @@ export function Sidebar() {
               } : undefined}
             >
               <item.icon />
-              {item.label}
+              {!collapsed && item.label}
             </button>
           );
         })}
       </nav>
 
       <div className="sidebar-footer">
-        {user && (
+        {!collapsed && user && (
           <div style={{ marginBottom: 8 }}>
             <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)' }}>{user.businessName}</div>
             <div style={{ fontSize: 11, color: 'var(--text-2)' }}>MST: {user.taxCode}</div>
           </div>
         )}
-        <button className="sidebar-item" onClick={handleLogout} id="sidebar-logout">
-          <IconLogout /> Đăng xuất
+        <button
+          className={`sidebar-item${collapsed ? ' sidebar-item--icon-only' : ''}`}
+          onClick={handleLogout}
+          id="sidebar-logout"
+          title={collapsed ? 'Đăng xuất' : undefined}
+        >
+          <IconLogout />
+          {!collapsed && 'Đăng xuất'}
         </button>
       </div>
     </aside>
   );
 }
 
+
+// ── Mobile Drawer Overlay ──────────────────────────────────────
+function MobileDrawer({ open, onClose }) {
+  // Prevent body scroll when open
+  useEffect(() => {
+    if (open) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => { document.body.style.overflow = ''; };
+  }, [open]);
+
+  if (!open) return null;
+
+  return (
+    <>
+      {/* Backdrop */}
+      <div className="mobile-drawer-backdrop" onClick={onClose} />
+      {/* Drawer */}
+      <div className="mobile-drawer">
+        <Sidebar onClose={onClose} />
+      </div>
+    </>
+  );
+}
+
+
+// ── Mobile Header ──────────────────────────────────────────────
+function MobileHeader({ onMenuOpen }) {
+  return (
+    <header className="mobile-header">
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <img
+          src={logoMonogram}
+          alt="ATRO"
+          style={{
+            width: 28, height: 28, objectFit: 'contain',
+            filter: 'invert(1) brightness(1.2) contrast(1.2)',
+            mixBlendMode: 'screen',
+          }}
+        />
+        <img
+          src={logoWordmark}
+          alt="ATRO Wordmark"
+          style={{
+            height: 14, objectFit: 'contain',
+            filter: 'invert(1) brightness(1.2) contrast(1.2)',
+            mixBlendMode: 'screen',
+          }}
+        />
+      </div>
+      <button
+        className="mobile-menu-btn"
+        onClick={onMenuOpen}
+        id="mobile-menu-btn"
+        aria-label="Mở menu"
+      >
+        <IconMenu />
+      </button>
+    </header>
+  );
+}
+
+
+// ── Bottom Navigation (mobile only) ───────────────────────────
+function BottomNav() {
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  return (
+    <nav className="bottom-nav" id="bottom-nav">
+      {BOTTOM_NAV_ITEMS.map(item => {
+        const active = location.pathname === item.path;
+        return (
+          <button
+            key={item.path}
+            id={`bottomnav-${item.path.slice(1)}`}
+            className={`nav-item${active ? ' active' : ''}`}
+            onClick={() => navigate(item.path)}
+          >
+            <item.icon />
+            <span>{item.label}</span>
+            {active && <div className="nav-dot" />}
+          </button>
+        );
+      })}
+    </nav>
+  );
+}
+
+
 // ── Main Layout wrapper ────────────────────────────────────────
 export default function Layout({ children }) {
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
+  // Auto-close drawer on route change
+  const location = useLocation();
+  useEffect(() => {
+    setDrawerOpen(false);
+  }, [location.pathname]);
+
   return (
     <div className="app-shell">
-      <Sidebar />
+      {/* Sidebar — hidden on mobile, icon-only on tablet, full on desktop */}
+      <div className="sidebar-wrapper">
+        <Sidebar collapsed={false} />
+      </div>
+      <div className="sidebar-wrapper--tablet">
+        <Sidebar collapsed={true} />
+      </div>
+
+      {/* Mobile Drawer overlay */}
+      <MobileDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
+
+      {/* Mobile Header */}
+      <MobileHeader onMenuOpen={() => setDrawerOpen(true)} />
+
+      {/* Main content */}
       <main className="main-content">
         {children}
       </main>
+
+      {/* Bottom Navigation — mobile only */}
+      <BottomNav />
     </div>
   );
 }

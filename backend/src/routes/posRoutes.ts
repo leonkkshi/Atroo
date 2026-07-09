@@ -9,6 +9,7 @@ import {
 import {
   getVouchers, createVoucher, updateVoucher, deleteVoucher, validateVoucher,
 } from '../controllers/voucherController';
+import { getReport } from '../controllers/reportController';
 
 const router = Router();
 
@@ -39,6 +40,9 @@ router.delete('/items/:id', deleteItem);
 // Hóa đơn bán hàng
 router.post('/invoices', createInvoice);
 router.get('/invoices',  getInvoices);
+
+// Báo cáo phân tích
+router.get('/report', getReport);
 
 // Chi phí phát sinh
 router.get('/expenses',       getExpenses);

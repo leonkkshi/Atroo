@@ -34,6 +34,7 @@ model User {
   posItems         PosItem[]
   vouchers         Voucher[]
   sessions         UserSession[]
+  customers        Customer[]
 }
 
 model TaxDeclaration {
@@ -118,6 +119,8 @@ model PosInvoice {
   payosOrderCode Int?     @unique
   voucherCode    String?                   // Mã voucher đã áp dụng (nếu có)
   discountAmount Float    @default(0)       // Số tiền giảm giá
+  customerId     String?                    // Khách hàng (nếu có)
+  customer       Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
   createdAt      DateTime @default(now())
 }
 
@@ -169,3 +172,35 @@ model UserSession {
   @@index([loginAt])
 }
 
+// ─── CRM — Khách hàng & Tích điểm ─────────────────────────────────────────────
+
+model Customer {
+  id          String    @id                              // "cus_<timestamp>"
+  userId      Int
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name        String
+  phone       String?
+  birthday    String?                                    // YYYY-MM-DD
+  points      Int       @default(0)                     // điểm tích lũy hiện tại
+  totalSpent  Float     @default(0)                     // tổng chi tiêu (tất cả thời gian)
+  tier        String    @default("STANDARD")            // "STANDARD" | "SILVER" | "GOLD" | "DIAMOND"
+  note        String    @default("")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  posInvoices PosInvoice[]
+  redemptions PointRedemption[]
+
+  @@unique([userId, phone])
+  @@index([userId])
+}
+
+model PointRedemption {
+  id          String   @id
+  customerId  String
+  customer    Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  pointsUsed  Int                                       // số điểm đã đổi
+  discountAmt Float                                     // số tiền giảm tương ứng (VNĐ)
+  voucherCode String?                                   // mã voucher tạo ra
+  note        String   @default("")
+  createdAt   DateTime @default(now())
+}

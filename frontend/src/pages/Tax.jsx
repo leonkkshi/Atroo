@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { taxApi } from '../api/client';
+import { taxApi, aiApi } from '../api/client';
 import { fmtMoney, fmtDate } from '../utils/format';
 
 const TAX_TYPES = [
@@ -108,7 +108,14 @@ export default function Tax() {
 
   const [declarations, setDeclarations] = useState([]);
   const [loadingDecl, setLoadingDecl] = useState(true);
-  const [tab, setTab] = useState('calc'); // 'calc' | 'history'
+  const [tab, setTab] = useState('calc'); // 'calc' | 'history' | 'ai'
+
+  // AI Auto-declaration state
+  const [aiPeriod, setAiPeriod] = useState('Quý 2/2026');
+  const [aiDeclLoading, setAiDeclLoading] = useState(false);
+  const [aiDeclResult, setAiDeclResult] = useState(null);
+  const [aiDeclError, setAiDeclError] = useState('');
+  const [aiDeclSaved, setAiDeclSaved] = useState(false);
 
   // Stepper Animation State
   const [stepperIndex, setStepperIndex] = useState(null);
@@ -248,8 +255,184 @@ export default function Tax() {
       {/* Tabs */}
       <div className="tabs mb-6">
         <button id="tax-tab-calc" className={`tab-btn${tab === 'calc' ? ' active' : ''}`} onClick={() => setTab('calc')}>🧮 Tính thuế</button>
+        <button id="tax-tab-ai" className={`tab-btn${tab === 'ai' ? ' active' : ''}`} onClick={() => setTab('ai')}>
+          <span className="ai-sparkle">✨</span> AI Tờ khai
+        </button>
         <button id="tax-tab-history" className={`tab-btn${tab === 'history' ? ' active' : ''}`} onClick={() => setTab('history')}>📂 Lịch sử tờ khai</button>
       </div>
+
+      {/* ── AI Auto-Declaration Panel ───────────────────────────────── */}
+      {tab === 'ai' && (
+        <div>
+          <div className="card mb-4" style={{ padding: '18px 20px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+              <span style={{ fontSize: 22 }}>🤖</span>
+              <div>
+                <div style={{ fontFamily: 'Syne, sans-serif', fontSize: 15, fontWeight: 700 }}>AI Tạo tờ khai tự động</div>
+                <div style={{ fontSize: 12, color: 'var(--text-2)', marginTop: 2 }}>
+                  AI đọc dữ liệu bán hàng POS, tính thuế theo Nghị định 68/2026 và sinh bản nháp tờ khai
+                </div>
+              </div>
+              <span className="ai-badge" style={{ marginLeft: 'auto' }}>AI</span>
+            </div>
+
+            <div className="ai-period-selector">
+              <span className="ai-period-label">Kỳ khai thuế:</span>
+              <select
+                id="ai-period-select"
+                className="ai-period-select"
+                value={aiPeriod}
+                onChange={e => { setAiPeriod(e.target.value); setAiDeclResult(null); setAiDeclError(''); setAiDeclSaved(false); }}
+              >
+                {['Tháng 01/2026','Tháng 02/2026','Tháng 03/2026','Tháng 04/2026','Tháng 05/2026','Tháng 06/2026','Tháng 07/2026',
+                  'Quý 1/2026','Quý 2/2026','Quý 3/2026','Quý 4/2026','Năm 2026'
+                ].map(p => <option key={p} value={p}>{p}</option>)}
+              </select>
+              <button
+                id="ai-gen-decl-btn"
+                className="ai-trigger-btn"
+                disabled={aiDeclLoading}
+                onClick={async () => {
+                  setAiDeclLoading(true);
+                  setAiDeclError('');
+                  setAiDeclResult(null);
+                  setAiDeclSaved(false);
+                  try {
+                    const data = await aiApi.autoDeclaration(aiPeriod, false);
+                    setAiDeclResult(data);
+                  } catch (err) {
+                    setAiDeclError(err.message || 'Không thể tạo tờ khai tự động.');
+                  } finally {
+                    setAiDeclLoading(false);
+                  }
+                }}
+              >
+                {aiDeclLoading ? <><span className="ai-loading-spinner" style={{ width: 14, height: 14, borderWidth: 2 }} /> Đang phân tích...</> : '⚡ Tạo tờ khai'}
+              </button>
+            </div>
+
+            {aiDeclError && (
+              <div style={{ color: 'var(--red)', fontSize: 13, padding: '8px 12px', background: 'rgba(239,68,68,0.08)', borderRadius: 8, border: '1px solid rgba(239,68,68,0.2)' }}>
+                ⚠️ {aiDeclError}
+              </div>
+            )}
+
+            {aiDeclLoading && (
+              <div className="ai-loading-wrap">
+                <div className="ai-loading-spinner" />
+                <div>AI đang đọc dữ liệu bán hàng và tính thuế...</div>
+              </div>
+            )}
+          </div>
+
+          {aiDeclResult && (() => {
+            const d = aiDeclResult.declaration;
+            return (
+              <div className="ai-declaration-preview">
+                <div className="ai-declaration-header">
+                  <span style={{ fontSize: 22 }}>🧾</span>
+                  <div className="ai-declaration-title">Tờ khai {d.period}</div>
+                  <span className="ai-badge" style={{ marginLeft: 'auto' }}>AI Draft</span>
+                </div>
+
+                <div style={{ fontSize: 11, color: 'var(--text-2)', marginBottom: 12 }}>
+                  Ngành: {d.bizLabel} · Nhóm doanh thu {d.revenueGroup}
+                </div>
+
+                <div className="ai-declaration-row">
+                  <span className="row-label">Doanh thu kỳ này</span>
+                  <span className="row-value">{fmtMoney(d.revenue)}</span>
+                </div>
+                <div className="ai-declaration-row">
+                  <span className="row-label">Chi phí hợp lý</span>
+                  <span className="row-value">{fmtMoney(d.expenses)}</span>
+                </div>
+
+                <div className="ai-declaration-divider" />
+
+                <div className="ai-declaration-row">
+                  <span className="row-label">Thuế GTGT ({(d.vatRate * 100).toFixed(1)}%)</span>
+                  <span className="row-value">{fmtMoney(d.vatAmount)}</span>
+                </div>
+                <div className="ai-declaration-row">
+                  <span className="row-label">
+                    Thuế TNCN ({(d.tncnRate * 100).toFixed(1)}%)
+                    {d.tncnAmount === 0 && !d.isExempt && (
+                      <span style={{ fontSize: 10, color: 'var(--text-2)', marginLeft: 4 }}>chưa vượt ngưỡng</span>
+                    )}
+                  </span>
+                  <span className="row-value">{fmtMoney(d.tncnAmount)}</span>
+                </div>
+
+                {d.isExempt && (
+                  <div style={{ fontSize: 11, color: '#10B981', padding: '4px 0', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    ✓ Doanh thu ≤ 500 triệu — Miễn thuế GTGT & TNCN
+                  </div>
+                )}
+
+                <div className="ai-declaration-row total-row">
+                  <span className="row-label">Tổng thuế phải nộp</span>
+                  <span className="row-value">{fmtMoney(d.totalTax)}</span>
+                </div>
+
+                {(aiDeclResult.aiComments?.length > 0 || aiDeclResult.warnings?.length > 0) && (
+                  <div className="ai-comments-section">
+                    <div className="ai-comments-title">💡 Nhận xét từ AI</div>
+                    {aiDeclResult.aiComments?.map((c, i) => (
+                      <div key={i} className="ai-comment-item">• {c}</div>
+                    ))}
+                    {aiDeclResult.warnings?.map((w, i) => (
+                      <div key={i} className="ai-warning-item">⚠️ {w}</div>
+                    ))}
+                  </div>
+                )}
+
+                <div className="ai-declaration-actions">
+                  <button
+                    id="ai-save-draft-btn"
+                    className="btn-save-draft"
+                    disabled={aiDeclSaved || aiDeclLoading}
+                    onClick={async () => {
+                      setAiDeclLoading(true);
+                      try {
+                        await aiApi.autoDeclaration(aiPeriod, true);
+                        setAiDeclSaved(true);
+                        const data = await taxApi.getDeclarations();
+                        setDeclarations(Array.isArray(data) ? data : []);
+                      } catch (err) {
+                        setAiDeclError(err.message);
+                      } finally {
+                        setAiDeclLoading(false);
+                      }
+                    }}
+                  >
+                    {aiDeclSaved ? '✓ Đã lưu bản nháp' : '💾 Lưu bản nháp'}
+                  </button>
+                  <button
+                    className="btn-edit-decl"
+                    onClick={() => {
+                      setRevenue(String(d.revenue));
+                      setExpenses(String(d.expenses));
+                      setPeriod(d.period);
+                      setBizType(d.businessType);
+                      setTaxType('HKD');
+                      setTab('calc');
+                    }}
+                  >
+                    ✏️ Chỉnh sửa
+                  </button>
+                  <button
+                    className="btn-cancel-decl"
+                    onClick={() => { setAiDeclResult(null); setAiDeclSaved(false); }}
+                  >
+                    Hủy
+                  </button>
+                </div>
+              </div>
+            );
+          })()}
+        </div>
+      )}
 
       {tab === 'calc' && (
         <>

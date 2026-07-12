@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { posApi, authApi, voucherApi } from '../api/client';
+import { posApi, authApi, voucherApi, aiApi } from '../api/client';
 import { fmtMoney, generateId } from '../utils/format';
 import { useAuth } from '../store/authStore';
 
@@ -128,6 +128,40 @@ function ItemFormModal({ onClose, onSaved, editItem = null }) {
   const [err, setErr] = useState('');
   const set = (k) => (e) => setForm(f => ({ ...f, [k]: e.target.value }));
 
+  // AI inline price suggestion state
+  const [aiHint, setAiHint] = useState(null);       // { suggestedPrice, direction, reason, changePercent }
+  const [aiHintLoading, setAiHintLoading] = useState(false);
+
+  // Auto-fetch AI suggestion for existing items (edit mode)
+  useEffect(() => {
+    if (!isEdit || !editItem?.id) return;
+    setAiHintLoading(true);
+    aiApi.priceSuggestions([editItem.id])
+      .then(data => {
+        const s = data?.suggestions?.[0];
+        if (s) setAiHint(s);
+      })
+      .catch(() => {})
+      .finally(() => setAiHintLoading(false));
+  }, [isEdit, editItem?.id]);
+
+  const fetchAiHint = async () => {
+    setAiHintLoading(true);
+    setAiHint(null);
+    try {
+      // For new items, pass empty array → backend gợi ý dựa trên tất cả sản phẩm cùng loại
+      const data = await aiApi.priceSuggestions([]);
+      // Tìm item gần nhất theo type và price range
+      const suggestions = data?.suggestions || [];
+      const match = suggestions.find(s => s.direction !== 'KEEP') || suggestions[0];
+      if (match) setAiHint({ ...match, isGeneral: true });
+    } catch (e) {
+      console.warn('AI price hint error:', e.message);
+    } finally {
+      setAiHintLoading(false);
+    }
+  };
+
   useEffect(() => {
     return () => {
       // Chỉ revoke nếu là blob URL mới tạo (không phải URL cũ từ server)
@@ -207,7 +241,58 @@ function ItemFormModal({ onClose, onSaved, editItem = null }) {
             <div className="form-row">
               <div className="input-group">
                 <label className="input-label">Giá bán (₫)</label>
-                <input className="input" type="number" placeholder="30000" value={form.price} onChange={set('price')} inputMode="numeric" />
+                <input
+                  className="input"
+                  type="number"
+                  placeholder="30000"
+                  value={form.price}
+                  onChange={e => { set('price')(e); setAiHint(null); }}
+                  inputMode="numeric"
+                />
+                {/* AI Inline Price Hint */}
+                {aiHintLoading && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6, fontSize: 12, color: 'var(--text-2)' }}>
+                    <div className="ai-loading-spinner" style={{ width: 14, height: 14, borderWidth: 2 }} />
+                    AI đang phân tích giá bán...
+                  </div>
+                )}
+                {aiHint && !aiHintLoading && (() => {
+                  const dirIcon = aiHint.direction === 'UP' ? '▲' : aiHint.direction === 'DOWN' ? '▼' : '──';
+                  const dirCls  = aiHint.direction === 'UP' ? 'price-change-up' : aiHint.direction === 'DOWN' ? 'price-change-down' : 'price-change-keep';
+                  return (
+                    <div className="ai-price-hint">
+                      <div className="ai-price-hint-icon">✨</div>
+                      <div className="ai-price-hint-body">
+                        <div className="ai-price-hint-label">AI Gợi ý giá{aiHint.isGeneral ? ' (tổng hợp)' : ''}</div>
+                        <div className="ai-price-hint-price">
+                          {new Intl.NumberFormat('vi-VN').format(aiHint.suggestedPrice)} ₫
+                          {' '}<span className={dirCls}>{dirIcon} {Math.abs(aiHint.changePercent)}%</span>
+                        </div>
+                        <div className="ai-price-hint-reason">{aiHint.reason}</div>
+                      </div>
+                      {aiHint.direction !== 'KEEP' && (
+                        <button
+                          type="button"
+                          className="ai-price-hint-apply"
+                          onClick={() => {
+                            setForm(f => ({ ...f, price: String(aiHint.suggestedPrice) }));
+                            setAiHint(null);
+                          }}
+                        >Áp dụng</button>
+                      )}
+                    </div>
+                  );
+                })()}
+                {!isEdit && !aiHint && !aiHintLoading && (
+                  <button
+                    type="button"
+                    className="ai-trigger-btn"
+                    style={{ marginTop: 8, padding: '6px 12px', fontSize: 12 }}
+                    onClick={fetchAiHint}
+                  >
+                    ✨ AI gợi ý giá
+                  </button>
+                )}
               </div>
               <div className="input-group">
                 <label className="input-label">Loại</label>

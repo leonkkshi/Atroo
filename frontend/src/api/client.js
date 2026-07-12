@@ -116,6 +116,17 @@ export const chatApi = {
   clear: () => request('/ai/history', { method: 'DELETE' }),
 };
 
+// ── AI Insights (Gợi ý giá, Dự báo DT, Tờ khai tự động) ──────
+export const aiApi = {
+  priceSuggestions: (itemIds) =>
+    request('/ai/price-suggestions', { method: 'POST', body: JSON.stringify({ itemIds: itemIds ?? [] }) }),
+  revenueForecast: () =>
+    request('/ai/revenue-forecast', { method: 'POST', body: JSON.stringify({}) }),
+  autoDeclaration: (period, saveAsDraft = false) =>
+    request('/ai/auto-declaration', { method: 'POST', body: JSON.stringify({ period, saveAsDraft }) }),
+};
+
+
 // ── Invoices OCR ───────────────────────────────────────────────
 export const invoiceApi = {
   analyze: (formData) => {

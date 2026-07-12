@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { posApi } from '../api/client';
+import { posApi, aiApi } from '../api/client';
 import { calendarApi } from '../api/client';
 import { fmtMoney, fmtDate, fmtTime, daysUntil, formatDaysLabel, animateCountUp } from '../utils/format';
 import { useAuth } from '../store/authStore';
@@ -11,6 +11,7 @@ import {
 import { Bar } from 'react-chartjs-2';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, LineElement, PointElement, Tooltip, Filler);
+
 
 // ── Skeleton cards ────────────────────────────────────────────
 function StatSkeleton() {
@@ -65,11 +66,50 @@ function DeadlineMini({ d }) {
   );
 }
 
+// ── AI Forecast Widget ────────────────────────────────────────
+function AiForecastWidget({ forecast, loading }) {
+  const fmtVND = (v) => new Intl.NumberFormat('vi-VN').format(v) + ' ₫';
+  if (loading) return <div className="skeleton ai-forecast-skeleton mb-6" />;
+  if (!forecast) return null;
+
+  const trendCls = forecast.trend === 'UP' ? 'up' : forecast.trend === 'DOWN' ? 'down' : 'stable';
+  const trendIcon = forecast.trend === 'UP' ? '📈' : forecast.trend === 'DOWN' ? '📉' : '──';
+  const growthLabel = forecast.growthRate > 0
+    ? `+${forecast.growthRate}%`
+    : forecast.growthRate < 0
+      ? `${forecast.growthRate}%`
+      : '0%';
+
+  return (
+    <div className="ai-forecast-widget mb-6">
+      <div className="ai-forecast-header">
+        <div className="ai-forecast-title">
+          <span className="ai-sparkle">✨</span>
+          AI Dự báo {forecast.forecastMonth}
+        </div>
+        <span className="ai-badge">AI</span>
+      </div>
+      <div className="ai-forecast-main">
+        <div className="ai-forecast-value">{fmtVND(forecast.predicted)}</div>
+        <div className={`ai-forecast-trend ${trendCls}`}>
+          {trendIcon} {growthLabel}
+        </div>
+      </div>
+      <div className="ai-forecast-range">
+        Khoảng tin cậy: {fmtVND(forecast.low)} – {fmtVND(forecast.high)}
+      </div>
+      <div className="ai-forecast-advice">💡 {forecast.advice}</div>
+    </div>
+  );
+}
+
 export default function Dashboard() {
   const { user } = useAuth();
   const [invoices, setInvoices] = useState([]);
   const [deadlines, setDeadlines] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [forecast, setForecast] = useState(null);
+  const [forecastLoading, setForecastLoading] = useState(true);
 
   useEffect(() => {
     Promise.all([
@@ -81,6 +121,15 @@ export default function Dashboard() {
     }).catch(console.error)
       .finally(() => setLoading(false));
   }, []);
+
+  // Fetch AI forecast separately (non-blocking)
+  useEffect(() => {
+    aiApi.revenueForecast()
+      .then(data => setForecast(data?.forecast ?? null))
+      .catch(() => setForecast(null))
+      .finally(() => setForecastLoading(false));
+  }, []);
+
 
   // ── Compute stats ──────────────────────────────────────────
   const today = new Date().toDateString();
@@ -240,7 +289,11 @@ export default function Dashboard() {
         )}
       </div>
 
+      {/* AI Revenue Forecast Widget */}
+      <AiForecastWidget forecast={forecast} loading={forecastLoading} />
+
       {/* Upcoming deadlines */}
+
       <div>
         <div className="section-title mb-3">⏰ Hạn nộp thuế sắp tới</div>
         {loading ? (

@@ -12,22 +12,23 @@ import {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-/** Tính [start, end] UTC cho một tháng */
+/** Tính [start, end] UTC cho một tháng theo giờ Việt Nam (UTC+7) */
 function monthRange(year: number, month: number): [Date, Date] {
-  const start = new Date(Date.UTC(year, month - 1, 1, 0, 0, 0, 0));
-  const end   = new Date(Date.UTC(year, month,     0, 23, 59, 59, 999));
-  start.setUTCHours(start.getUTCHours() - 7);
-  end.setUTCHours(end.getUTCHours() - 7 + 24);
+  // Đầu tháng 00:00:00 VN = UTC-7h
+  const start = new Date(Date.UTC(year, month - 1, 1, 0, 0, 0, 0) - 7 * 3600 * 1000);
+  // Cuối tháng 23:59:59.999 VN: ngày cuối = ngày 0 của tháng sau
+  const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  const end = new Date(Date.UTC(year, month - 1, lastDay, 23, 59, 59, 999) - 7 * 3600 * 1000);
   return [start, end];
 }
 
 function getBizRates(businessType: string): { vatRate: number; tncnRate: number; bizLabel: string } {
   switch (businessType) {
     case '1': return { vatRate: 0.01, tncnRate: 0.005, bizLabel: 'Phân phối, cung cấp hàng hóa' };
-    case '2': return { vatRate: 0.05, tncnRate: 0.02,  bizLabel: 'Dịch vụ không bao thầu NVL (Ăn uống, cắt tóc, sửa xe...)' };
+    case '2': return { vatRate: 0.05, tncnRate: 0.02,  bizLabel: 'Dịch vụ, xây dựng không bao thầu NVL (Ăn uống, cắt tóc, sửa xe, dịch vụ số...)' };
     case '3': return { vatRate: 0.03, tncnRate: 0.015, bizLabel: 'Sản xuất, vận tải, xây dựng có bao thầu NVL' };
     case '5': return { vatRate: 0.05, tncnRate: 0.05,  bizLabel: 'Cho thuê tài sản' };
-    case '6': return { vatRate: 0.05, tncnRate: 0.05,  bizLabel: 'Dịch vụ thông tin số, quảng cáo số' };
+    case '6': return { vatRate: 0.05, tncnRate: 0.02,  bizLabel: 'Dịch vụ không bao thầu NVL (Dịch vụ thông tin số)' }; // không có trong NĐ68 — dùng tỷ lệ dịch vụ
     case '4':
     default:  return { vatRate: 0.02, tncnRate: 0.01,  bizLabel: 'Hoạt động kinh doanh khác' };
   }
@@ -201,8 +202,7 @@ export const autoDeclaration = async (req: AuthenticatedRequest, res: Response) 
     const expenses_ = expenses.reduce((s, e) => s + e.amount, 0);
 
     // 4. Tính thuế (logic từ taxController)
-    const EXEMPT_THRESHOLD        = 500_000_000;
-    const TNCN_GROUP2_THRESHOLD   = 1_000_000_000;
+    const EXEMPT_THRESHOLD        = 1_000_000_000;  // 1 tỷ — ngưỡng miễn thuế mới 2026
     const GROUP3_THRESHOLD        = 3_000_000_000;
     const GROUP4_THRESHOLD        = 50_000_000_000;
 
@@ -219,7 +219,7 @@ export const autoDeclaration = async (req: AuthenticatedRequest, res: Response) 
     } else if (revenue <= GROUP3_THRESHOLD) {
       revenueGroup = 2;
       vatAmount  = revenue * vatRate;
-      const taxableIncomeTNCN = Math.max(revenue - TNCN_GROUP2_THRESHOLD, 0);
+      const taxableIncomeTNCN = Math.max(revenue - EXEMPT_THRESHOLD, 0); // vượt 1 tỷ
       tncnAmount = taxableIncomeTNCN * tncnRate;
     } else if (revenue <= GROUP4_THRESHOLD) {
       revenueGroup = 3;

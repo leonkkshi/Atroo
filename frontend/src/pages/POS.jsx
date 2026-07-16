@@ -943,27 +943,42 @@ function CartSheet({ cart, onClose, onQty, onRemove, onCheckout, user, bankProfi
   const [doneInvoice, setDoneInvoice] = useState(null);
 
   // Voucher state
-  const [voucherInput, setVoucherInput] = useState('');
   const [voucherApplied, setVoucherApplied] = useState(null); // { code, discountAmount, description }
   const [voucherErr, setVoucherErr] = useState('');
   const [voucherLoading, setVoucherLoading] = useState(false);
+  const [showVoucherPicker, setShowVoucherPicker] = useState(false);
+  const [availableVouchers, setAvailableVouchers] = useState([]);
+  const [vouchersLoading, setVouchersLoading] = useState(false);
 
   const subtotal = cart.reduce((s, it) => s + it.price * it.quantity, 0);
   const tax      = Math.round(calcTax(cart, user));
   const discount = voucherApplied?.discountAmount || 0;
   const total    = subtotal - discount;
 
-  const handleApplyVoucher = async () => {
-    if (!voucherInput.trim()) return;
+  const handleOpenVoucherPicker = async () => {
+    setShowVoucherPicker(true);
+    setVouchersLoading(true);
+    setVoucherErr('');
+    try {
+      const res = await voucherApi.getAll();
+      const active = (res.vouchers || []).filter(v => v.status === 'ACTIVE');
+      setAvailableVouchers(active);
+    } catch {
+      setAvailableVouchers([]);
+    } finally {
+      setVouchersLoading(false);
+    }
+  };
+
+  const handleSelectVoucher = async (voucher) => {
     setVoucherErr('');
     setVoucherLoading(true);
     try {
-      const res = await voucherApi.validate(voucherInput.trim(), subtotal);
+      const res = await voucherApi.validate(voucher.code, subtotal);
       setVoucherApplied({ code: res.voucher.code, discountAmount: res.discountAmount, description: res.voucher.description });
-      setVoucherInput('');
+      setShowVoucherPicker(false);
     } catch (e) {
       setVoucherErr(e.message);
-      setVoucherApplied(null);
     } finally {
       setVoucherLoading(false);
     }
@@ -1086,7 +1101,7 @@ function CartSheet({ cart, onClose, onQty, onRemove, onCheckout, user, bankProfi
 
           <div className="divider" />
 
-          {/* Voucher input */}
+          {/* Voucher picker */}
           {voucherApplied ? (
             <div style={{
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -1114,30 +1129,130 @@ function CartSheet({ cart, onClose, onQty, onRemove, onCheckout, user, bankProfi
               <div style={{ fontSize: 12, color: 'var(--text-2)', marginBottom: 6, fontWeight: 600 }}>
                 🎟 Mã giảm giá
               </div>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <input
-                  id="voucher-input"
-                  className="input"
-                  placeholder="Nhập mã voucher..."
-                  value={voucherInput}
-                  onChange={e => { setVoucherInput(e.target.value.toUpperCase()); setVoucherErr(''); }}
-                  style={{ flex: 1, height: 40, fontSize: 13, letterSpacing: 1 }}
-                  onKeyDown={e => e.key === 'Enter' && handleApplyVoucher()}
-                />
-                <button
-                  id="apply-voucher-btn"
-                  className="btn btn-primary"
-                  style={{ height: 40, padding: '0 16px', fontSize: 13, flexShrink: 0 }}
-                  onClick={handleApplyVoucher}
-                  disabled={voucherLoading || !voucherInput.trim()}
-                >
-                  {voucherLoading ? '...' : 'Áp dụng'}
-                </button>
-              </div>
+              <button
+                id="select-voucher-btn"
+                className="btn btn-ghost"
+                style={{
+                  width: '100%', height: 44, fontSize: 13, display: 'flex',
+                  alignItems: 'center', justifyContent: 'space-between',
+                  border: '1.5px dashed var(--border)', borderRadius: 12,
+                  padding: '0 14px', color: 'var(--text-2)',
+                }}
+                onClick={handleOpenVoucherPicker}
+              >
+                <span>Chọn voucher giảm giá...</span>
+                <span style={{ fontSize: 16 }}>›</span>
+              </button>
               {voucherErr && (
                 <div style={{ fontSize: 12, color: 'var(--danger)', marginTop: 5 }}>⚠️ {voucherErr}</div>
               )}
             </div>
+          )}
+
+          {/* Voucher Picker Modal */}
+          {showVoucherPicker && (
+            <>
+              <div
+                style={{
+                  position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
+                  zIndex: 9998, backdropFilter: 'blur(4px)',
+                }}
+                onClick={() => setShowVoucherPicker(false)}
+              />
+              <div style={{
+                position: 'fixed', bottom: 0, left: 0, right: 0,
+                background: 'var(--surface)', borderRadius: '20px 20px 0 0',
+                zIndex: 9999, maxHeight: '75vh', display: 'flex', flexDirection: 'column',
+                boxShadow: '0 -8px 40px rgba(0,0,0,0.3)',
+              }}>
+                {/* Handle */}
+                <div style={{ display: 'flex', justifyContent: 'center', padding: '12px 0 4px' }}>
+                  <div style={{ width: 40, height: 4, borderRadius: 2, background: 'var(--border)' }} />
+                </div>
+                {/* Header */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 20px 12px' }}>
+                  <div style={{ fontFamily: 'Syne', fontWeight: 700, fontSize: 17 }}>🎟 Chọn voucher</div>
+                  <button className="btn btn-ghost btn-sm" onClick={() => setShowVoucherPicker(false)}>✕</button>
+                </div>
+                {/* List */}
+                <div style={{ overflowY: 'auto', padding: '0 16px 32px', flex: 1 }}>
+                  {vouchersLoading ? (
+                    <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text-2)', fontSize: 14 }}>Đang tải...</div>
+                  ) : availableVouchers.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '40px 0' }}>
+                      <div style={{ fontSize: 36, marginBottom: 8 }}>🎟</div>
+                      <div style={{ fontSize: 14, color: 'var(--text-2)' }}>Không có voucher khả dụng</div>
+                    </div>
+                  ) : (
+                    availableVouchers.map(v => {
+                      const eligible = subtotal >= (v.minOrderAmount || 0);
+                      const expired = v.expiresAt && new Date(v.expiresAt) < new Date();
+                      const disabled = !eligible || expired || voucherLoading;
+                      const discountLabel = v.type === 'PERCENT'
+                        ? `Giảm ${v.value}%`
+                        : `Giảm ${fmtMoney(v.value)}`;
+                      return (
+                        <button
+                          key={v.id}
+                          disabled={disabled}
+                          onClick={() => !disabled && handleSelectVoucher(v)}
+                          style={{
+                            width: '100%', marginBottom: 10, padding: 0, background: 'none',
+                            border: 'none', cursor: disabled ? 'not-allowed' : 'pointer',
+                            opacity: disabled ? 0.45 : 1, textAlign: 'left',
+                          }}
+                        >
+                          <div style={{
+                            borderRadius: 14, overflow: 'hidden',
+                            border: '1.5px solid var(--border)',
+                            display: 'flex', minHeight: 76,
+                          }}>
+                            {/* Left accent stripe + code */}
+                            <div style={{
+                              width: 80, minWidth: 80, display: 'flex', flexDirection: 'column',
+                              alignItems: 'center', justifyContent: 'center',
+                              background: 'linear-gradient(135deg, var(--accent), var(--accent-2, #7c3aed))',
+                              padding: '10px 6px', gap: 4,
+                            }}>
+                              <span style={{ fontSize: 20 }}>🎟</span>
+                              <span style={{ fontSize: 9, fontWeight: 800, color: '#fff', letterSpacing: 0.5, textAlign: 'center', wordBreak: 'break-all' }}>{v.code}</span>
+                            </div>
+                            {/* Right info */}
+                            <div style={{ flex: 1, padding: '10px 14px', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 3 }}>
+                              <div style={{ fontFamily: 'Syne', fontWeight: 700, fontSize: 15, color: 'var(--accent)' }}>{discountLabel}</div>
+                              {v.description && (
+                                <div style={{ fontSize: 11, color: 'var(--text-2)', lineHeight: 1.4 }}>{v.description}</div>
+                              )}
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 2 }}>
+                                {v.minOrderAmount > 0 && (
+                                  <span style={{ fontSize: 10, color: 'var(--text-2)', background: 'var(--bg)', borderRadius: 6, padding: '2px 6px' }}>
+                                    Đơn tối thiểu {fmtMoney(v.minOrderAmount)}
+                                  </span>
+                                )}
+                                {v.expiresAt && (
+                                  <span style={{ fontSize: 10, color: expired ? 'var(--danger)' : 'var(--text-2)', background: 'var(--bg)', borderRadius: 6, padding: '2px 6px' }}>
+                                    HSD: {new Date(v.expiresAt).toLocaleDateString('vi-VN')}
+                                  </span>
+                                )}
+                                {!eligible && !expired && (
+                                  <span style={{ fontSize: 10, color: 'var(--amber, #f59e0b)', background: 'rgba(245,158,11,0.1)', borderRadius: 6, padding: '2px 6px' }}>
+                                    Chưa đủ điều kiện
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            {/* Chevron */}
+                            {!disabled && (
+                              <div style={{ display: 'flex', alignItems: 'center', paddingRight: 14, color: 'var(--text-2)' }}>›</div>
+                            )}
+                          </div>
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            </>
           )}
 
           {/* Totals */}

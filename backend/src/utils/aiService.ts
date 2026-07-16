@@ -304,22 +304,36 @@ export async function reviewTaxDeclaration(input: TaxDeclarationInput): Promise<
       ? Math.round((input.expenses / input.revenue) * 1000) / 10
       : 0;
 
+    // Mô tả cách tính TNCN theo nhóm để AI hiểu đúng
+    const tncnMethod =
+      input.isExempt      ? 'Miễn thuế (DT ≤ 1 tỷ)' :
+      input.revenueGroup === 2 ? `Trực tiếp: (DT - 1 tỷ) × ${(input.tncnRate * 100).toFixed(1)}% = ${input.tncnAmount.toLocaleString('vi-VN')} ₫` :
+      input.revenueGroup === 3 ? `Lợi nhuận: (DT - CP) × 17% = ${input.tncnAmount.toLocaleString('vi-VN')} ₫` :
+      input.revenueGroup === 4 ? `Lợi nhuận: (DT - CP) × 20% = ${input.tncnAmount.toLocaleString('vi-VN')} ₫` :
+      'Không áp dụng';
+
     const prompt = `Bạn là chuyên gia kế toán thuế cho hộ kinh doanh nhỏ tại Việt Nam (Nghị định 68/2026/NĐ-CP).
 
+Quy định nhóm doanh thu:
+- Nhóm 1 (≤ 1 tỷ): Miễn thuế GTGT và TNCN
+- Nhóm 2 (1–3 tỷ): GTGT = DT × tỷ lệ ngành; TNCN = (DT - 1 tỷ) × tỷ lệ ngành
+- Nhóm 3 (3–50 tỷ): GTGT = DT × tỷ lệ ngành; TNCN = (DT - CP) × 17%
+- Nhóm 4 (>50 tỷ): GTGT = DT × tỷ lệ ngành; TNCN = (DT - CP) × 20%
+
 Tờ khai thuế kỳ "${input.period}":
-- Ngành: ${input.bizLabel} (loại ${input.businessType})
+- Ngành: ${input.bizLabel} (Loại ${input.businessType} — GTGT ${(input.vatRate * 100).toFixed(1)}%, TNCN ngành ${(input.tncnRate * 100).toFixed(1)}%)
 - Doanh thu: ${input.revenue.toLocaleString('vi-VN')} ₫
 - Chi phí hợp lý: ${input.expenses.toLocaleString('vi-VN')} ₫ (tỷ lệ ${expenseRatio}%)
 - Nhóm doanh thu: Nhóm ${input.revenueGroup}
-- Thuế GTGT (${(input.vatRate * 100).toFixed(1)}%): ${input.vatAmount.toLocaleString('vi-VN')} ₫
-- Thuế TNCN (${(input.tncnRate * 100).toFixed(1)}%): ${input.tncnAmount.toLocaleString('vi-VN')} ₫
+- Thuế GTGT: ${input.vatAmount.toLocaleString('vi-VN')} ₫
+- Cách tính TNCN: ${tncnMethod}
 - Tổng thuế: ${input.totalTax.toLocaleString('vi-VN')} ₫
 - Miễn thuế: ${input.isExempt ? 'Có' : 'Không'}
 
 Kiểm tra và đưa ra nhận xét (tối đa 3 mục, mỗi mục dưới 100 ký tự). Tập trung vào:
-- Tỷ lệ chi phí có bất thường không?
-- Có nên chuyển phương pháp khai thuế không?
-- Cảnh báo nếu gần ngưỡng chuyển nhóm doanh thu
+- Tỷ lệ chi phí có bất thường không (quá thấp < 10% hoặc quá cao > 90%)?
+- Có nên chuyển phương pháp khai thuế không (Nhóm 2: so sánh trực tiếp vs lợi nhuận)?
+- Cảnh báo nếu doanh thu gần ngưỡng chuyển nhóm (Nhóm 1→2: gần 1 tỷ; Nhóm 2→3: gần 3 tỷ)
 
 Trả về CHÍNH XÁC JSON (không có text khác):
 {
@@ -350,20 +364,35 @@ function fallbackTaxReview(input: TaxDeclarationInput): AutoDeclarationResult {
   const warnings: string[] = [];
 
   if (input.isExempt) {
-    comments.push('Doanh thu ≤ 500 triệu: được miễn thuế GTGT và TNCN.');
-    comments.push('Vẫn phải nộp Tờ khai theo quy định trước ngày 31/01 năm sau.');
+    // Nhóm 1: miễn thuế
+    comments.push('Doanh thu ≤ 1 tỷ: được miễn thuế GTGT và TNCN (Nghị định 68/2026).');
+    comments.push('Vẫn phải nộp Tờ khai doanh thu 1-2 lần/năm theo quy định.');
   } else {
     comments.push(`Thuế GTGT ${(input.vatRate * 100).toFixed(1)}% tính trên toàn bộ doanh thu.`);
-    if (input.tncnAmount === 0 && input.revenueGroup === 2) {
-      comments.push('Thuế TNCN miễn: doanh thu chưa vượt ngưỡng 1 tỷ đồng (Nghị định 68/2026).');
+    if (input.revenueGroup === 2) {
+      // Nhóm 2: TNCN = (DT - 1 tỷ) × tỷ lệ
+      comments.push(`Thuế TNCN ${(input.tncnRate * 100).toFixed(1)}%: tính trên phần vượt 1 tỷ = ${(input.tncnAmount / 1e6).toFixed(1)} triệu ₫.`);
+    } else if (input.revenueGroup === 3) {
+      // Nhóm 3: TNCN = lợi nhuận × 17%
+      const profit = Math.max(0, input.revenue - input.expenses);
+      comments.push(`Thuế TNCN 17% × lợi nhuận (${(profit / 1e6).toFixed(0)} triệu) = ${(input.tncnAmount / 1e6).toFixed(1)} triệu ₫.`);
+    } else if (input.revenueGroup === 4) {
+      // Nhóm 4: TNCN = lợi nhuận × 20%
+      const profit = Math.max(0, input.revenue - input.expenses);
+      comments.push(`Thuế TNCN 20% × lợi nhuận (${(profit / 1e6).toFixed(0)} triệu) = ${(input.tncnAmount / 1e6).toFixed(1)} triệu ₫.`);
     }
   }
 
   // Cảnh báo gần ngưỡng nhóm
-  const nearGroup3 = input.revenue > 2_500_000_000 && input.revenue <= 3_000_000_000;
+  const nearGroup2 = input.revenue > 900_000_000  && input.revenue <= 1_000_000_000; // gần 1 tỷ
+  const nearGroup3 = input.revenue > 2_700_000_000 && input.revenue <= 3_000_000_000; // gần 3 tỷ
   const nearGroup4 = input.revenue > 45_000_000_000 && input.revenue <= 50_000_000_000;
+
+  if (nearGroup2) {
+    warnings.push('Doanh thu gần ngưỡng 1 tỷ. Sắp chuyển sang Nhóm 2 — bắt đầu phát sinh thuế GTGT và TNCN.');
+  }
   if (nearGroup3) {
-    warnings.push('Doanh thu gần ngưỡng 3 tỷ. Sắp phải áp dụng kê khai theo lợi nhuận (Nhóm 3).');
+    warnings.push('Doanh thu gần ngưỡng 3 tỷ. Sắp phải kê khai theo lợi nhuận (Nhóm 3, TNCN 17%).');
   }
   if (nearGroup4) {
     warnings.push('Doanh thu gần ngưỡng 50 tỷ. Chuẩn bị cho thuế suất TNCN 20% (Nhóm 4).');
@@ -372,6 +401,9 @@ function fallbackTaxReview(input: TaxDeclarationInput): AutoDeclarationResult {
   const expenseRatio = input.revenue > 0 ? input.expenses / input.revenue : 0;
   if (expenseRatio < 0.10 && input.expenses > 0 && !input.isExempt) {
     warnings.push('Chi phí thấp bất thường (<10% DT). Kiểm tra có bỏ sót chi phí hợp lý không.');
+  }
+  if (expenseRatio > 0.90 && !input.isExempt) {
+    warnings.push('Chi phí chiếm trên 90% DT. Kiểm tra lại chi phí hợp lý trước khi nộp tờ khai.');
   }
 
   return { declaration: input, aiComments: comments, warnings };

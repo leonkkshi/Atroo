@@ -297,7 +297,7 @@ export const createInvoice = async (req: AuthenticatedRequest, res: Response) =>
       discountAmount?: number;
     };
 
-    if (!total || !items || !Array.isArray(items) || items.length === 0) {
+    if (total === undefined || total === null || !items || !Array.isArray(items) || items.length === 0) {
       res.status(400).json({ error: 'Hóa đơn không hợp lệ. Vui lòng kiểm tra lại.' });
       return;
     }

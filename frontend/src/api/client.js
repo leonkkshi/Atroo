@@ -131,7 +131,7 @@ export const aiApi = {
 export const invoiceApi = {
   analyze: (formData) => {
     const token = getToken();
-    return fetch(`${BASE}/invoices/analyze`, {
+    return fetch(`${BASE}/invoices/upload`, {
       method: 'POST',
       headers: token ? { Authorization: `Bearer ${token}` } : {},
       body: formData,

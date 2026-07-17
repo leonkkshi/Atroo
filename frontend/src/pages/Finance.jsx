@@ -166,7 +166,7 @@ function AddExpenseModal({ onClose, onAdded }) {
 }
 
 // ─── Tab: Tổng quan ───────────────────────────────────────────────────────────
-function TabOverview({ invoices, expenses, loading }) {
+function TabOverview({ invoices, expenses, loading, reportData, reportLoading }) {
   const [period, setPeriod] = useState('month');
 
   const now = new Date();
@@ -176,6 +176,7 @@ function TabOverview({ invoices, expenses, loading }) {
   else if (period === 'year') { periodStart.setMonth(0); periodStart.setDate(1); periodStart.setHours(0, 0, 0, 0); }
 
   const todayStr = now.toISOString().slice(0, 10);
+  // invoices list dùng cho cashflow chart 30 ngày + recent transactions (list ~200 gần nhất)
   const filteredInvoices = invoices.filter(inv => new Date(inv.createdAt) >= periodStart);
   const filteredExpenses = expenses.filter(exp => {
     if (period === 'day') return exp.date === todayStr;
@@ -183,13 +184,18 @@ function TabOverview({ invoices, expenses, loading }) {
     return d >= periodStart;
   });
 
-  const totalRevenue  = filteredInvoices.reduce((s, i) => s + i.total, 0);
-  const totalTax      = filteredInvoices.reduce((s, i) => s + (i.estimatedTax || 0), 0);
-  const totalExpenses = filteredExpenses.reduce((s, e) => s + e.amount, 0);
-  const profit        = totalRevenue - totalTax - totalExpenses;
-  const txCount       = filteredInvoices.length;
+  // Stats: ưu tiên dùng reportData (chính xác từ DB không bị giới hạn limit)
+  // reportData mặc định là tháng này — khớp với period='month' (mặc định)
+  // Khi người dùng đổi period khác (hôm nay/năm nay), fallback về client-side
+  const useReportStats = reportData && period === 'month';
+  const totalRevenue  = useReportStats ? reportData.revenue  : filteredInvoices.reduce((s, i) => s + i.total, 0);
+  const totalTax      = useReportStats ? reportData.taxTotal : filteredInvoices.reduce((s, i) => s + (i.estimatedTax || 0), 0);
+  const totalExpenses = useReportStats ? reportData.expenses : filteredExpenses.reduce((s, e) => s + e.amount, 0);
+  const profit        = useReportStats ? reportData.profit   : totalRevenue - totalTax - totalExpenses;
+  const txCount       = useReportStats ? reportData.txCount  : filteredInvoices.length;
+  const statsLoading  = loading || (period === 'month' && reportLoading);
 
-  // Cashflow 30 ngày
+  // Cashflow 30 ngày — dùng list invoices local (đủ cho chart trend)
   const dayMap    = buildLast30Days(invoices);
   const dayLabels = Object.keys(dayMap).map(k => new Date(k).toLocaleDateString('vi-VN', { day: 'numeric', month: 'numeric' }));
   const lineData  = {
@@ -201,10 +207,10 @@ function TabOverview({ invoices, expenses, loading }) {
     }],
   };
 
-  // Payment breakdown
-  const pmCash = filteredInvoices.filter(i => i.paymentMethod === 'CASH').reduce((s, i) => s + i.total, 0);
-  const pmQR   = filteredInvoices.filter(i => i.paymentMethod === 'QR_BANK').reduce((s, i) => s + i.total, 0);
-  const pmCard = filteredInvoices.filter(i => i.paymentMethod === 'CARD').reduce((s, i) => s + i.total, 0);
+  // Payment breakdown — dùng reportData khi có (tháng này), fallback client-side
+  const pmCash = useReportStats ? (reportData.paymentBreakdown?.cash || 0) : filteredInvoices.filter(i => i.paymentMethod === 'CASH').reduce((s, i) => s + i.total, 0);
+  const pmQR   = useReportStats ? (reportData.paymentBreakdown?.qr   || 0) : filteredInvoices.filter(i => i.paymentMethod === 'QR_BANK').reduce((s, i) => s + i.total, 0);
+  const pmCard = useReportStats ? (reportData.paymentBreakdown?.card || 0) : filteredInvoices.filter(i => i.paymentMethod === 'CARD').reduce((s, i) => s + i.total, 0);
   const payData = {
     labels: ['Tiền mặt', 'QR Bank', 'Thẻ'],
     datasets: [{
@@ -226,19 +232,19 @@ function TabOverview({ invoices, expenses, loading }) {
       </div>
 
       {/* Stats grid */}
-      {loading ? (
+      {statsLoading ? (
         <div className="stats-grid mb-6">{[1,2,3,4].map(i => <Skeleton key={i} />)}</div>
       ) : (
         <div className="stats-grid mb-6">
           <div className="card stat-card">
             <div className="stat-label">Doanh thu bán hàng</div>
             <div className="stat-value">{fmtNum(totalRevenue)} ₫</div>
-            <div className="stat-change">{txCount} giao dịch</div>
+            <div className="stat-change">{txCount} giao dịch{useReportStats && <span style={{ color: 'var(--accent)', fontSize: 10, marginLeft: 4 }}>✓ chính xác</span>}</div>
           </div>
           <div className="card stat-card">
             <div className="stat-label">Chi phí đã nhập</div>
             <div className="stat-value" style={{ color: 'var(--amber)' }}>{fmtNum(totalExpenses)} ₫</div>
-            <div className="stat-change">{filteredExpenses.length} khoản chi</div>
+            <div className="stat-change">{useReportStats ? '' : `${filteredExpenses.length} khoản chi`}</div>
           </div>
           <div className="card stat-card">
             <div className="stat-label">Thuế ước tính</div>
@@ -930,9 +936,9 @@ export default function Finance() {
   const [reportLoading, setReportLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
 
-  // Load invoices
+  // Load invoices — chỉ dùng cho cashflow chart 30 ngày + list giao dịch gần đây
   useEffect(() => {
-    posApi.getInvoices(1000)
+    posApi.getInvoices(200)
       .then(d => setInvoices(d.invoices || []))
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -957,7 +963,7 @@ export default function Finance() {
   }, [reportParams]);
 
   useEffect(() => {
-    if (['report', 'products', 'heatmap'].includes(activeTab)) {
+    if (['overview', 'report', 'products', 'heatmap'].includes(activeTab)) {
       fetchReport();
     }
   }, [fetchReport, activeTab]);
@@ -1040,7 +1046,13 @@ export default function Finance() {
 
       {/* Tab content */}
       {activeTab === 'overview' && (
-        <TabOverview invoices={invoices} expenses={expenses} loading={loading || expLoading} />
+        <TabOverview
+          invoices={invoices}
+          expenses={expenses}
+          loading={loading || expLoading}
+          reportData={reportData}
+          reportLoading={reportLoading}
+        />
       )}
       {activeTab === 'report' && (
         <TabReport

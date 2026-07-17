@@ -23,16 +23,22 @@ function monthRange(year: number, month: number): [Date, Date] {
 }
 
 function getBizRates(businessType: string): { vatRate: number; tncnRate: number; bizLabel: string } {
+  // businessType values phải khớp với BIZ_TYPES trong Settings.jsx frontend:
+  //   '1' = Phân phối / hàng hóa     → VAT 1%  + TNCN 0.5%
+  //   '2' = Dịch vụ thuần túy        → VAT 5%  + TNCN 2%   (tiệm tóc, sửa xe, dịch vụ số...)
+  //   '3' = Sản xuất / ăn uống       → VAT 3%  + TNCN 1.5% (quán cơm, bún phở — tự chế biến NVL)
+  //   '4' = Hoạt động kinh doanh khác→ VAT 2%  + TNCN 1%
   switch (businessType) {
-    case '1': return { vatRate: 0.01, tncnRate: 0.005, bizLabel: 'Phân phối, cung cấp hàng hóa' };
-    case '2': return { vatRate: 0.05, tncnRate: 0.02,  bizLabel: 'Dịch vụ, xây dựng không bao thầu NVL (Ăn uống, cắt tóc, sửa xe, dịch vụ số...)' };
-    case '3': return { vatRate: 0.03, tncnRate: 0.015, bizLabel: 'Sản xuất, vận tải, xây dựng có bao thầu NVL' };
+    case '1': return { vatRate: 0.01, tncnRate: 0.005, bizLabel: 'Phân phối, cung cấp hàng hóa (Đại lý, tạp hóa...)' };
+    case '2': return { vatRate: 0.05, tncnRate: 0.02,  bizLabel: 'Dịch vụ thuần túy (Tiệm tóc, sửa xe, giặt ủi, dịch vụ số...)' };
+    case '3': return { vatRate: 0.03, tncnRate: 0.015, bizLabel: 'Sản xuất, vận tải, ăn uống (Quán cơm, bún phở, phở — tự mua NVL chế biến)' };
     case '5': return { vatRate: 0.05, tncnRate: 0.05,  bizLabel: 'Cho thuê tài sản' };
-    case '6': return { vatRate: 0.05, tncnRate: 0.02,  bizLabel: 'Dịch vụ không bao thầu NVL (Dịch vụ thông tin số)' }; // không có trong NĐ68 — dùng tỷ lệ dịch vụ
+    case '6': return { vatRate: 0.05, tncnRate: 0.02,  bizLabel: 'Dịch vụ không bao thầu nguyên vật liệu' };
     case '4':
     default:  return { vatRate: 0.02, tncnRate: 0.01,  bizLabel: 'Hoạt động kinh doanh khác' };
   }
 }
+
 
 // ─── POST /ai/price-suggestions ──────────────────────────────────────────────
 /**

@@ -112,7 +112,7 @@ export default function Settings() {
     bankName: '',
     bankAccount: '',
     bankAccountName: '',
-    businessType: '3',
+    businessType: '2',
     revenueGoal: '',
     staffSize: '',
   });
@@ -146,7 +146,7 @@ export default function Settings() {
           bankName: data.bankName || '',
           bankAccount: data.bankAccount || '',
           bankAccountName: data.bankAccountName || '',
-          businessType: data.businessType || '3',
+          businessType: data.businessType || '2',
           revenueGoal: data.revenueGoal != null ? data.revenueGoal.toString() : '',
           staffSize: data.staffSize != null ? data.staffSize.toString() : '',
         });
@@ -162,7 +162,7 @@ export default function Settings() {
             bankName: user.bankName || '',
             bankAccount: user.bankAccount || '',
             bankAccountName: user.bankAccountName || '',
-            businessType: user.businessType || '3',
+            businessType: user.businessType || '2',
             revenueGoal: user.revenueGoal != null ? user.revenueGoal.toString() : '',
             staffSize: user.staffSize != null ? user.staffSize.toString() : '',
           }));

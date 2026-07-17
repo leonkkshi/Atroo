@@ -11,14 +11,14 @@ import prisma from '../utils/prisma';
 // NHÓM 3: DT 3 tỷ → 50 tỷ      → TNCN = (DT - chi phí) × 17%
 // NHÓM 4: DT > 50 tỷ            → TNCN = (DT - chi phí) × 20%
 //
-// Tỷ lệ VAT/TNCN theo ngành nghề (Nghị định 68/2026):
-//   1: Phân phối, cung cấp hàng hóa                        → VAT 1%,  TNCN 0.5%
-//   2: Dịch vụ, xây dựng không bao thầu NVL                → VAT 5%,  TNCN 2%
-//      (bao gồm: ăn uống, cắt tóc, dịch vụ số, tư vấn...)
-//   3: Sản xuất, vận tải, xây dựng bao thầu NVL             → VAT 3%,  TNCN 1.5%
-//   4: Hoạt động kinh doanh khác                           → VAT 2%,  TNCN 1%
-//   5: Cho thuê tài sản                                      → VAT 5%,  TNCN 5%
-//   (Nghị định 68/2026: Chỉ 5 nhóm ngành nghề chính thức)
+// Tỷ lệ VAT/TNCN theo ngành nghề (Nghị định 68/2026) — khớp với Settings.jsx frontend:
+//   '1': Phân phối, cung cấp hàng hóa (Đại lý, tạp hóa)  → VAT 1%,  TNCN 0.5%
+//   '2': Dịch vụ thuần túy không bao thầu NVL              → VAT 5%,  TNCN 2%
+//        (Cắt tóc, sửa xe, giặt ủi, dịch vụ số, tư vấn...)
+//   '3': Sản xuất, vận tải, ăn uống — tự mua NVL chế biến → VAT 3%,  TNCN 1.5%
+//        (Quán cơm, bún phở, phở — chế biến từ nguyên liệu thô)
+//   '4': Hoạt động kinh doanh khác                         → VAT 2%,  TNCN 1%
+//   '5': Cho thuê tài sản                                   → VAT 5%,  TNCN 5%
 // =====================================================================
 
 const EXEMPT_THRESHOLD = 1_000_000_000;     // 1 tỷ — ngưỡng miễn thuế và tính TNCN Nhóm 2 (quy định mới 2026)
@@ -32,11 +32,11 @@ const TNCN_PROFIT_RATE_GROUP4 = 0.20; // 20%
 function getBizRates(businessType: string): { vatRate: number; tncnRate: number; bizLabel: string } {
   switch (businessType) {
     case '1':
-      return { vatRate: 0.01, tncnRate: 0.005, bizLabel: 'Phân phối, cung cấp hàng hóa (Bán buôn, bán lẻ)' };
+      return { vatRate: 0.01, tncnRate: 0.005, bizLabel: 'Phân phối, cung cấp hàng hóa (Đại lý, tạp hóa, bán lẻ)' };
     case '2':
-      return { vatRate: 0.05, tncnRate: 0.02, bizLabel: 'Dịch vụ, xây dựng không bao thầu NVL (Ăn uống, cắt tóc, sửa xe, dịch vụ số...)' };
+      return { vatRate: 0.05, tncnRate: 0.02, bizLabel: 'Dịch vụ thuần túy (Cắt tóc, sửa xe, giặt ủi, dịch vụ số...)' };
     case '3':
-      return { vatRate: 0.03, tncnRate: 0.015, bizLabel: 'Sản xuất, vận tải, xây dựng có bao thầu nguyên vật liệu' };
+      return { vatRate: 0.03, tncnRate: 0.015, bizLabel: 'Sản xuất, vận tải, ăn uống (Quán cơm, bún phở — tự mua NVL chế biến)' };
     case '5':
       return { vatRate: 0.05, tncnRate: 0.05, bizLabel: 'Cho thuê tài sản (Bất động sản, máy móc, thiết bị...)' };
     case '6':

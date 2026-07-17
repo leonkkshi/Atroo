@@ -166,8 +166,8 @@ function AddExpenseModal({ onClose, onAdded }) {
 }
 
 // ─── Tab: Tổng quan ───────────────────────────────────────────────────────────
-function TabOverview({ invoices, expenses, loading, reportData, reportLoading }) {
-  const [period, setPeriod] = useState('month');
+function TabOverview({ invoices, expenses, loading, overviewReport, overviewReportLoading, overviewPeriod, setOverviewPeriod }) {
+  const period = overviewPeriod;
 
   const now = new Date();
   const periodStart = new Date();
@@ -184,16 +184,16 @@ function TabOverview({ invoices, expenses, loading, reportData, reportLoading })
     return d >= periodStart;
   });
 
-  // Stats: ưu tiên dùng reportData (chính xác từ DB không bị giới hạn limit)
-  // reportData mặc định là tháng này — khớp với period='month' (mặc định)
-  // Khi người dùng đổi period khác (hôm nay/năm nay), fallback về client-side
-  const useReportStats = reportData && period === 'month';
-  const totalRevenue  = useReportStats ? reportData.revenue  : filteredInvoices.reduce((s, i) => s + i.total, 0);
-  const totalTax      = useReportStats ? reportData.taxTotal : filteredInvoices.reduce((s, i) => s + (i.estimatedTax || 0), 0);
-  const totalExpenses = useReportStats ? reportData.expenses : filteredExpenses.reduce((s, e) => s + e.amount, 0);
-  const profit        = useReportStats ? reportData.profit   : totalRevenue - totalTax - totalExpenses;
-  const txCount       = useReportStats ? reportData.txCount  : filteredInvoices.length;
-  const statsLoading  = loading || (period === 'month' && reportLoading);
+  // Stats: dùng overviewReport (chính xác từ DB) cho month và year
+  // 'day' fallback client-side (200 invoices đủ cho hôm nay)
+  const useReportStats = overviewReport && period !== 'day';
+  const totalRevenue  = useReportStats ? overviewReport.revenue  : filteredInvoices.reduce((s, i) => s + i.total, 0);
+  const totalTax      = useReportStats ? overviewReport.taxTotal : filteredInvoices.reduce((s, i) => s + (i.estimatedTax || 0), 0);
+  const totalExpenses = useReportStats ? overviewReport.expenses : filteredExpenses.reduce((s, e) => s + e.amount, 0);
+  const profit        = useReportStats ? overviewReport.profit   : totalRevenue - totalTax - totalExpenses;
+  const txCount       = useReportStats ? overviewReport.txCount  : filteredInvoices.length;
+  const statsLoading  = loading || (period !== 'day' && overviewReportLoading);
+
 
   // Cashflow 30 ngày — dùng list invoices local (đủ cho chart trend)
   const dayMap    = buildLast30Days(invoices);
@@ -207,10 +207,10 @@ function TabOverview({ invoices, expenses, loading, reportData, reportLoading })
     }],
   };
 
-  // Payment breakdown — dùng reportData khi có (tháng này), fallback client-side
-  const pmCash = useReportStats ? (reportData.paymentBreakdown?.cash || 0) : filteredInvoices.filter(i => i.paymentMethod === 'CASH').reduce((s, i) => s + i.total, 0);
-  const pmQR   = useReportStats ? (reportData.paymentBreakdown?.qr   || 0) : filteredInvoices.filter(i => i.paymentMethod === 'QR_BANK').reduce((s, i) => s + i.total, 0);
-  const pmCard = useReportStats ? (reportData.paymentBreakdown?.card || 0) : filteredInvoices.filter(i => i.paymentMethod === 'CARD').reduce((s, i) => s + i.total, 0);
+  // Payment breakdown — dùng overviewReport khi có (month/year), fallback client-side
+  const pmCash = useReportStats ? (overviewReport.paymentBreakdown?.cash || 0) : filteredInvoices.filter(i => i.paymentMethod === 'CASH').reduce((s, i) => s + i.total, 0);
+  const pmQR   = useReportStats ? (overviewReport.paymentBreakdown?.qr   || 0) : filteredInvoices.filter(i => i.paymentMethod === 'QR_BANK').reduce((s, i) => s + i.total, 0);
+  const pmCard = useReportStats ? (overviewReport.paymentBreakdown?.card || 0) : filteredInvoices.filter(i => i.paymentMethod === 'CARD').reduce((s, i) => s + i.total, 0);
   const payData = {
     labels: ['Tiền mặt', 'QR Bank', 'Thẻ'],
     datasets: [{
@@ -226,7 +226,7 @@ function TabOverview({ invoices, expenses, loading, reportData, reportLoading })
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
         <div className="tabs" style={{ width: 'auto' }}>
           {[['day','Hôm nay'],['month','Tháng này'],['year','Năm nay']].map(([v, l]) => (
-            <button key={v} className={`tab-btn${period === v ? ' active' : ''}`} onClick={() => setPeriod(v)} style={{ padding: '8px 10px', fontSize: 12 }}>{l}</button>
+            <button key={v} className={`tab-btn${period === v ? ' active' : ''}`} onClick={() => setOverviewPeriod(v)} style={{ padding: '8px 10px', fontSize: 12 }}>{l}</button>
           ))}
         </div>
       </div>
@@ -925,12 +925,40 @@ export default function Finance() {
   const [loading, setLoading]     = useState(true);
   const [expLoading, setExpLoading] = useState(true);
 
-  // Report state
+  // ── Overview period state (lifted từ TabOverview để fetch đúng API) ──────────
   const now = new Date();
+  const curYear  = now.getFullYear();
+  const curMonth = now.getMonth() + 1;
+  const [overviewPeriod, setOverviewPeriod] = useState('month');
+  const [overviewReport, setOverviewReport] = useState(null);
+  const [overviewReportLoading, setOverviewReportLoading] = useState(false);
+
+  // Fetch overview report khi period thay đổi hoặc vào tab overview
+  // 'day' → không cần API (200 invoices đủ cho hôm nay)
+  // 'month' → getReport(month, curMonth, curYear)
+  // 'year'  → getReport(year,  curYear, curYear)  ← lấy đầy đủ cả năm từ DB
+  const fetchOverviewReport = useCallback((period) => {
+    if (period === 'day') { setOverviewReport(null); return; }
+    setOverviewReportLoading(true);
+    const [type, value, year] = period === 'year'
+      ? ['year', curYear, curYear]
+      : ['month', curMonth, curYear];
+    posApi.getReport(type, value, year)
+      .then(d => setOverviewReport(d))
+      .catch(console.error)
+      .finally(() => setOverviewReportLoading(false));
+  }, [curYear, curMonth]);
+
+  // Chạy lần đầu và khi overviewPeriod thay đổi
+  useEffect(() => {
+    if (activeTab === 'overview') fetchOverviewReport(overviewPeriod);
+  }, [overviewPeriod, activeTab, fetchOverviewReport]);
+
+  // ── Report tab state (độc lập với overview) ──────────────────────────────────
   const [reportParams, setReportParams] = useState({
     type:  'month',
-    value: now.getMonth() + 1,
-    year:  now.getFullYear(),
+    value: curMonth,
+    year:  curYear,
   });
   const [reportData,    setReportData]    = useState(null);
   const [reportLoading, setReportLoading] = useState(false);
@@ -953,7 +981,7 @@ export default function Finance() {
       .finally(() => setExpLoading(false));
   }, [user]);
 
-  // Fetch report whenever params change or tab switches to a report-related tab
+  // Fetch report tab data
   const fetchReport = useCallback(() => {
     setReportLoading(true);
     posApi.getReport(reportParams.type, reportParams.value, reportParams.year)
@@ -963,7 +991,7 @@ export default function Finance() {
   }, [reportParams]);
 
   useEffect(() => {
-    if (['overview', 'report', 'products', 'heatmap'].includes(activeTab)) {
+    if (['report', 'products', 'heatmap'].includes(activeTab)) {
       fetchReport();
     }
   }, [fetchReport, activeTab]);
@@ -1050,8 +1078,10 @@ export default function Finance() {
           invoices={invoices}
           expenses={expenses}
           loading={loading || expLoading}
-          reportData={reportData}
-          reportLoading={reportLoading}
+          overviewReport={overviewReport}
+          overviewReportLoading={overviewReportLoading}
+          overviewPeriod={overviewPeriod}
+          setOverviewPeriod={setOverviewPeriod}
         />
       )}
       {activeTab === 'report' && (

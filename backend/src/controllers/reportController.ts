@@ -110,16 +110,18 @@ function buildSubPeriods(
   year: number,
   value: number,
 ) {
+  // Helper: chuyển UTC Date (đã điều chỉnh UTC+7) sang VN date string YYYY-MM-DD
+  const toVnStr = (d: Date) => new Date(d.getTime() + 7 * 3600 * 1000).toISOString().slice(0, 10);
+
   if (type === 'year') {
     // 12 tháng trong năm
     return Array.from({ length: 12 }, (_, i) => {
       const m = i + 1;
       const [start, end] = monthRange(year, m);
+      const sStr = toVnStr(start);
+      const eStr = toVnStr(end);
       const inv  = invoices.filter(x => x.createdAt >= start && x.createdAt <= end);
-      const exp  = expenses.filter(x => {
-        const d = new Date(x.date);
-        return d >= start && d <= end;
-      });
+      const exp  = expenses.filter(x => x.date >= sStr && x.date <= eStr);
       const rev  = calcRevenue(inv);
       const tax  = calcTax(inv);
       const cost = calcExpenses(exp);
@@ -138,11 +140,10 @@ function buildSubPeriods(
     return Array.from({ length: 3 }, (_, i) => {
       const m = startMonth + i;
       const [start, end] = monthRange(year, m);
+      const sStr = toVnStr(start);
+      const eStr = toVnStr(end);
       const inv  = invoices.filter(x => x.createdAt >= start && x.createdAt <= end);
-      const exp  = expenses.filter(x => {
-        const d = new Date(x.date);
-        return d >= start && d <= end;
-      });
+      const exp  = expenses.filter(x => x.date >= sStr && x.date <= eStr);
       const rev  = calcRevenue(inv);
       const tax  = calcTax(inv);
       const cost = calcExpenses(exp);
@@ -160,11 +161,10 @@ function buildSubPeriods(
   return Array.from({ length: 4 }, (_, i) => {
     const wStart = new Date(pStart.getTime() + i * 7 * 86400000);
     const wEnd   = new Date(pStart.getTime() + (i + 1) * 7 * 86400000 - 1);
+    const sStr = toVnStr(wStart);
+    const eStr = toVnStr(wEnd);
     const inv  = invoices.filter(x => x.createdAt >= wStart && x.createdAt <= wEnd);
-    const exp  = expenses.filter(x => {
-      const d = new Date(x.date);
-      return d >= wStart && d <= wEnd;
-    });
+    const exp  = expenses.filter(x => x.date >= sStr && x.date <= eStr);
     const rev  = calcRevenue(inv);
     const tax  = calcTax(inv);
     const cost = calcExpenses(exp);
@@ -238,11 +238,11 @@ export const getReport = async (req: AuthenticatedRequest, res: Response) => {
     ]);
 
     // ── Filter expenses JS-side by date range ────────────────────────────
-    const startStr = start.toISOString().slice(0, 10);
-    const endStr   = end.toISOString().slice(0, 10);
+    const startStr = new Date(start.getTime() + 7 * 3600 * 1000).toISOString().slice(0, 10);
+    const endStr   = new Date(end.getTime()   + 7 * 3600 * 1000).toISOString().slice(0, 10);
     const filteredExpenses     = expenses.filter(e => e.date >= startStr && e.date <= endStr);
-    const prevStartStr = prevStart.toISOString().slice(0, 10);
-    const prevEndStr   = prevEnd.toISOString().slice(0, 10);
+    const prevStartStr = new Date(prevStart.getTime() + 7 * 3600 * 1000).toISOString().slice(0, 10);
+    const prevEndStr   = new Date(prevEnd.getTime()   + 7 * 3600 * 1000).toISOString().slice(0, 10);
     const filteredPrevExpenses = prevExpenses.filter(e => e.date >= prevStartStr && e.date <= prevEndStr);
 
     // ── Current period metrics ────────────────────────────────────────────

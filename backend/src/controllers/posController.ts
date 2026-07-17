@@ -334,15 +334,38 @@ export const createInvoice = async (req: AuthenticatedRequest, res: Response) =>
 
 // ─── GET /pos/invoices ────────────────────────────────────────────────────────
 // Lịch sử hóa đơn của user hiện tại
+// Query params: limit (số), fromDate / toDate (ISO date string YYYY-MM-DD, theo múi giờ VN UTC+7)
 export const getInvoices = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const userId = req.user!.id;
     const limit = parseInt((req.query.limit as string) ?? '50', 10);
 
+    // Filter theo kỳ thời gian nếu có truyền fromDate / toDate
+    const fromDateStr = req.query.fromDate as string | undefined;
+    const toDateStr   = req.query.toDate   as string | undefined;
+
+    let dateFilter: { gte?: Date; lte?: Date } = {};
+    if (fromDateStr) {
+      // Chuyển VN date string sang UTC: 00:00 VN = 17:00 UTC ngày hôm trước
+      const from = new Date(fromDateStr + 'T00:00:00+07:00');
+      dateFilter.gte = from;
+    }
+    if (toDateStr) {
+      // 23:59:59 VN = 16:59:59 UTC ngày hôm sau
+      const to = new Date(toDateStr + 'T23:59:59+07:00');
+      dateFilter.lte = to;
+    }
+
+    const whereClause: { userId: number; createdAt?: { gte?: Date; lte?: Date } } = { userId };
+    if (fromDateStr || toDateStr) {
+      whereClause.createdAt = dateFilter;
+    }
+
     const invoices = await prisma.posInvoice.findMany({
-      where: { userId },
+      where: whereClause,
       orderBy: { createdAt: 'desc' },
-      take: limit,
+      // Nếu filter theo ngày thì bỏ limit để lấy toàn bộ trong kỳ; ngược lại giới hạn
+      ...(fromDateStr || toDateStr ? {} : { take: limit }),
       select: {
         id: true,
         total: true,

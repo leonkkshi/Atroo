@@ -70,7 +70,12 @@ export const posApi = {
   },
   deleteItem: (id) => request(`/pos/items/${id}`, { method: 'DELETE' }),
   createInvoice: (invoice) => request('/pos/invoices', { method: 'POST', body: JSON.stringify(invoice) }),
-  getInvoices: (limit = 50) => request(`/pos/invoices?limit=${limit}`),
+  getInvoices: (limit = 50, fromDate, toDate) => {
+    const params = new URLSearchParams({ limit: String(limit) });
+    if (fromDate) params.set('fromDate', fromDate);
+    if (toDate)   params.set('toDate', toDate);
+    return request(`/pos/invoices?${params}`);
+  },
   getReport: (type, value, year) => {
     const params = new URLSearchParams({ type, value: String(value), year: String(year) });
     return request(`/pos/report?${params}`);
